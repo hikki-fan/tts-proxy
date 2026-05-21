@@ -383,6 +383,7 @@ async function synthesizeAndSend(params, res, opts = {}) {
   const key = cacheKey(keyPayload);
   const cached = await cache.get(key, format);
   if (cached) {
+    console.log(`[TTS]  ${new Date().toISOString()} CACHE_HIT  voice=${voice} model=${model} chars=${text.length} format=${format} ${Date.now()-startMs}ms`);
     if (opts.log) logger.logTtsCall({ chars: text.length, voice, format, model, cached: true, duration: Date.now() - startMs });
     return sendAudio(res, cached, format, true);
   }
@@ -408,7 +409,9 @@ async function synthesizeAndSend(params, res, opts = {}) {
 
   const audio = await mimo.synthesize({ text, voice, format, userMessage, model, emotion, cloneAudioData });
   await cache.set(key, format, audio);
-  if (opts.log) logger.logTtsCall({ chars: text.length, voice, format, model, cached: false, duration: Date.now() - startMs });
+  const dur = Date.now() - startMs;
+  console.log(`[TTS]  ${new Date().toISOString()} SYNTH      voice=${voice} model=${model} chars=${text.length} format=${format} ${dur}ms`);
+  if (opts.log) logger.logTtsCall({ chars: text.length, voice, format, model, cached: false, duration: dur });
   return sendAudio(res, audio, format, false);
 }
 

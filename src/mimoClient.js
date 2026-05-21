@@ -21,12 +21,16 @@ class MimoClient {
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    const t0 = Date.now();
+
+    const model = options.model || this.model;
+    const chars = (options.text || '').length;
+    const voiceLabel = options.cloneAudioData ? '[clone-audio]' : (options.voice || '-');
+    const emotionTag = options.emotion?.enabled ? '+emotion' : '';
 
     try {
-      const model = options.model || this.model;
       const audio = { format: options.format };
       if (options.cloneAudioData) {
-        // 克隆模型：传入音频样本 base64 数据
         audio.voice = options.cloneAudioData;
       } else if (!isVoiceDesignModel(model) && options.voice) {
         audio.voice = options.voice;
@@ -50,23 +54,34 @@ class MimoClient {
       });
 
       const raw = await response.text();
+      const ms = Date.now() - t0;
+
       if (!response.ok) {
+        const details = parseJson(raw) || raw.slice(0, 300);
+        console.error(`[MiMo] ${ts()} ${model}${emotionTag} voice=${voiceLabel} chars=${chars} ${ms}ms HTTP ${response.status} ERR: ${JSON.stringify(details)}`);
         const error = new Error(`MiMo API request failed with HTTP ${response.status}`);
         error.statusCode = response.status;
-        error.details = parseJson(raw) || raw.slice(0, 500);
+        error.details = details;
         throw error;
       }
 
       const json = parseJson(raw);
       const audioData = findAudioData(json);
       if (!audioData) {
+        console.error(`[MiMo] ${ts()} ${model}${emotionTag} voice=${voiceLabel} chars=${chars} ${ms}ms NO_AUDIO`);
         const error = new Error('MiMo API response did not include audio data');
         error.statusCode = 502;
         error.details = json;
         throw error;
       }
 
+      console.log(`[MiMo] ${ts()} ${model}${emotionTag} voice=${voiceLabel} chars=${chars} ${ms}ms OK`);
       return Buffer.from(audioData, 'base64');
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        console.error(`[MiMo] ${ts()} ${model}${emotionTag} voice=${voiceLabel} chars=${chars} TIMEOUT`);
+      }
+      throw err;
     } finally {
       clearTimeout(timeout);
     }
@@ -94,6 +109,10 @@ class MimoClient {
     messages.push({ role: 'assistant', content: text });
     return messages;
   }
+}
+
+function ts() {
+  return new Date().toISOString();
 }
 
 function isVoiceDesignModel(model) {
