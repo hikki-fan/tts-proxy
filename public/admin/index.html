@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MiMo TTS 管理</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="stylesheet" href="/admin/styles.css">
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="sidebar-logo">
+          <div class="brand-icon">
+            <svg viewBox="0 0 18 18" fill="none">
+              <rect x="1" y="6" width="2" height="6" rx="1" fill="white"/>
+              <rect x="5" y="3" width="2" height="12" rx="1" fill="white"/>
+              <rect x="9" y="1" width="2" height="16" rx="1" fill="white"/>
+              <rect x="13" y="4" width="2" height="10" rx="1" fill="white"/>
+              <rect x="17" y="7" width="1" height="4" rx="0.5" fill="white"/>
+            </svg>
+          </div>
+          <div class="sidebar-brand-text">
+            <strong>MiMo TTS</strong>
+            <span>HTTP Proxy</span>
+          </div>
+        </div>
+        <nav class="nav" aria-label="页面导航">
+          <a href="#overview" data-label="概览">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="2" width="7" height="7" rx="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5"/></svg>
+            <span class="nav-label">概览</span>
+          </a>
+          <a href="#stats" data-label="统计">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 3v14h14"/><path d="M6.5 14V10"/><path d="M10.5 14V7"/><path d="M14.5 14V9"/></svg>
+            <span class="nav-label">统计</span>
+          </a>
+          <a href="#settings" data-label="配置">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10" cy="10" r="2.8"/><path d="M10 1.8v2M10 16.2v2M1.8 10h2M16.2 10h2M4.6 4.6l1.4 1.4M14 14l1.4 1.4M4.6 15.4l1.4-1.4M14 6l1.4-1.4"/></svg>
+            <span class="nav-label">配置</span>
+          </a>
+          <a href="#studio" data-label="工作台">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="7" y="2" width="6" height="9" rx="3"/><path d="M4 10a6 6 0 0 0 12 0"/><line x1="10" y1="16" x2="10" y2="19"/><line x1="7" y1="19" x2="13" y2="19"/></svg>
+            <span class="nav-label">工作台</span>
+          </a>
+        </nav>
+        <div class="sidebar-bottom">
+          <button id="sidebarToggle" type="button" class="nav-icon-sq" title="展开侧边栏">
+            <svg id="sidebarToggleIcon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><polyline points="8 4 14 10 8 16"/></svg>
+          </button>
+          <button id="logoutBtn" type="button" class="nav-icon-sq" hidden title="退出登录">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 17H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h4"/><polyline points="13 14 18 10 13 6"/><line x1="18" y1="10" x2="7" y2="10"/></svg>
+          </button>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <h1>管理控制台</h1>
+            <p id="baseUrl">正在连接服务</p>
+          </div>
+          <div class="toolbar">
+            <span id="mimoStatus" class="status">MiMo</span>
+            <span id="cacheStatus" class="status">Cache</span>
+            <div class="topbar-actions">
+              <button id="refreshBtn" type="button" class="icon-action-btn" title="刷新">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M17 7A8 8 0 1 0 18 11"/><polyline points="17 2 17 7 12 7"/></svg>
+              </button>
+              <div class="theme-picker-wrap">
+                <button id="themeBtn" type="button" class="icon-action-btn" title="切换主题">
+                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10" cy="10" r="8"/><circle cx="7.5" cy="8" r="1.2" fill="currentColor" stroke="none"/><circle cx="12.5" cy="8" r="1.2" fill="currentColor" stroke="none"/><circle cx="10" cy="13" r="1.2" fill="currentColor" stroke="none"/></svg>
+                </button>
+                <div id="themeMenu" class="theme-menu" hidden>
+                  <button class="theme-swatch" data-theme="" title="靛蓝（默认）" style="--sw:#4f6ef2"></button>
+                  <button class="theme-swatch" data-theme="coral" title="珊瑚" style="--sw:#f0655a"></button>
+                  <button class="theme-swatch" data-theme="forest" title="翠绿" style="--sw:#10b981"></button>
+                  <button class="theme-swatch" data-theme="violet" title="紫罗兰" style="--sw:#8b5cf6"></button>
+                  <button class="theme-swatch" data-theme="ocean" title="深海蓝" style="--sw:#0891b2"></button>
+                  <button class="theme-swatch" data-theme="dark" title="深色" style="--sw:#1e293b"></button>
+                  <div class="theme-custom-sep"></div>
+                  <label class="theme-custom-label" title="自选颜色">
+                    <input type="color" id="customAccentColor" value="#4f6ef2">
+                    <span>自选</span>
+                  </label>
+                </div>
+              </div>
+              <button id="aboutBtn" type="button" class="icon-action-btn" title="关于项目">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10" cy="10" r="8"/><line x1="10" y1="9" x2="10" y2="14"/><circle cx="10" cy="6.5" r="0.5" fill="currentColor"/></svg>
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <div id="authWarning" class="auth-warning" hidden>
+          <span>⚠ 管理员 Token 未配置，任何人均可访问此页面。请在</span>
+          <a href="#settings" class="hint-link">配置</a>
+          <span>页面设置管理 Token 以启用登录保护。</span>
+        </div>
+
+        <!-- 概览 -->
+        <section id="overview" class="section" hidden>
+          <div class="section-head">
+            <h2>概览</h2>
+            <button id="clearCacheBtn" type="button">清理缓存</button>
+          </div>
+          <div class="metrics">
+            <div class="metric"><span>音色</span><strong id="voiceCount">0</strong></div>
+            <div class="metric"><span>缓存文件</span><strong id="cacheCount">0</strong></div>
+            <div class="metric"><span>缓存体积</span><strong id="cacheBytes">0 B</strong></div>
+            <div class="metric"><span>模型</span><strong id="modelName">-</strong></div>
+          </div>
+          <div class="endpoint-grid">
+            <label>
+              <span>本地订阅源</span>
+              <div class="copy-line">
+                <input id="sourceUrlLocal" readonly>
+                <button data-copy="sourceUrlLocal" type="button">复制</button>
+              </div>
+            </label>
+            <label>
+              <span>对外订阅源</span>
+              <div class="copy-line">
+                <input id="sourceUrlPublic" readonly>
+                <button data-copy="sourceUrlPublic" type="button">复制</button>
+              </div>
+              <p id="sourceUrlPublicHint" class="url-hint" hidden>
+                未配置对外地址——请在<a href="#settings" class="hint-link">配置</a>中填写「对外访问地址」后保存。
+              </p>
+            </label>
+            <label class="wide">
+              <span>旧版订阅源（对外）</span>
+              <div class="copy-line">
+                <input id="legacySourceUrl" readonly>
+                <button data-copy="legacySourceUrl" type="button">复制</button>
+              </div>
+            </label>
+            <label class="wide">
+              <span>一键导入</span>
+              <div class="copy-line">
+                <input id="importUrl" readonly>
+                <button data-copy="importUrl" type="button">复制</button>
+              </div>
+            </label>
+          </div>
+
+          <!-- 订阅预览 -->
+          <div class="source-preview-wrap">
+            <div class="source-preview-head">
+              <h3>订阅预览</h3>
+              <div class="toolbar">
+                <label class="check"><input id="legacyToggle" type="checkbox"><span>旧版字段</span></label>
+                <button id="reloadSourceBtn" type="button">重载</button>
+                <button id="copySourceJsonBtn" type="button">复制 JSON</button>
+              </div>
+            </div>
+            <textarea id="sourcePreview" readonly spellcheck="false"></textarea>
+          </div>
+        </section>
+
+        <!-- 统计 -->
+        <section id="stats" class="section" hidden>
+          <div class="section-head">
+            <div>
+              <h2>用量统计</h2>
+              <p class="section-note">TTS 接口调用次数与字符数。</p>
+            </div>
+            <div class="period-tabs">
+              <button type="button" data-period="day" class="period-btn active">今日</button>
+              <button type="button" data-period="week" class="period-btn">7 天</button>
+              <button type="button" data-period="month" class="period-btn">30 天</button>
+            </div>
+          </div>
+          <div class="stats-totals" id="statsTotals"></div>
+          <div class="chart-mode-tabs">
+            <button type="button" data-mode="calls" class="chart-mode-btn active">调用次数</button>
+            <button type="button" data-mode="chars" class="chart-mode-btn">字符数</button>
+          </div>
+          <div class="chart-canvas-wrap" id="statsChart"></div>
+        </section>
+
+        <!-- 配置 -->
+        <section id="settings" class="section" hidden>
+          <div class="section-head">
+            <div><h2>配置</h2><p class="section-note">保存后立即生效。</p></div>
+            <button id="saveSettingsBtn" form="settingsForm" type="submit" class="primary">保存配置</button>
+          </div>
+          <form id="settingsForm" class="settings-grid">
+            <label>
+              <span>MiMo API Key</span>
+              <input id="settingsMimoApiKey" type="password" autocomplete="off" placeholder="留空不修改">
+            </label>
+            <label class="check setting-check">
+              <input id="clearMimoApiKey" type="checkbox"><span>清空 MiMo API Key</span>
+            </label>
+            <label>
+              <span>MiMo Base URL</span>
+              <input id="settingsMimoBaseUrl" placeholder="https://api.xiaomimimo.com/v1">
+            </label>
+            <label>
+              <span>默认模型</span>
+              <select id="settingsMimoModel"></select>
+            </label>
+            <label class="wide">
+              <span>对外访问地址（IP / 域名 / 端口）</span>
+              <div class="host-port-row">
+                <select id="settingsPublicProto">
+                  <option value="http">http://</option>
+                  <option value="https">https://</option>
+                </select>
+                <input id="settingsPublicHost" placeholder="IP 地址或域名，如 192.168.1.100">
+                <span class="port-sep">:</span>
+                <input id="settingsPublicPort" type="number" min="1" max="65535" placeholder="3000" class="port-input">
+              </div>
+            </label>
+            <label><span>默认 voice</span><select id="settingsDefaultVoice"></select></label>
+            <label>
+              <span>默认格式</span>
+              <select id="settingsDefaultFormat">
+                <option value="mp3">mp3</option>
+                <option value="wav">wav</option>
+                <option value="pcm16">pcm16</option>
+              </select>
+            </label>
+            <label><span>请求超时毫秒</span><input id="settingsRequestTimeoutMs" type="number" min="1000" step="1000"></label>
+            <label>
+              <span class="token-label-row">阅读访问 Token<button type="button" class="clear-token-btn" data-clear="clearAccessToken" data-input="settingsAccessToken">清空</button></span>
+              <input type="checkbox" id="clearAccessToken" style="display:none">
+              <input id="settingsAccessToken" type="password" autocomplete="off" placeholder="留空不修改">
+            </label>
+            <label>
+              <span class="token-label-row">管理 Token<button type="button" class="clear-token-btn" data-clear="clearAdminToken" data-input="settingsAdminToken">清空</button></span>
+              <input type="checkbox" id="clearAdminToken" style="display:none">
+              <input id="settingsAdminToken" type="password" autocomplete="off" placeholder="留空不修改">
+            </label>
+          </form>
+        </section>
+
+        <!-- 工作台（合成测试 + 情感分析 + 音色管理） -->
+        <section id="studio" class="section studio-section" hidden>
+          <div class="studio-tabs-bar">
+            <button type="button" class="studio-tab active" data-studio="test">合成测试</button>
+            <button type="button" class="studio-tab" data-studio="voices">音色管理</button>
+            <span id="testState" class="muted studio-state">待测试</span>
+          </div>
+
+          <!-- 合成测试面板 -->
+          <div id="studioTest" class="studio-panel">
+            <form id="testForm">
+              <div class="composer-head">
+                <div>
+                  <h3>合成方案</h3>
+                  <p>支持标准 TTS、声音设计及克隆模型。</p>
+                </div>
+                <label class="model-picker">
+                  <span>模型</span>
+                  <select id="modelSelect"></select>
+                </label>
+              </div>
+
+              <div id="modeCards" class="mode-grid" aria-label="合成方案"></div>
+
+              <div id="modeFields" class="mode-fields">
+                <label data-mode-field="design">
+                  <span>声音设计描述</span>
+                  <input id="voiceDescription" placeholder="例如：温柔、陪伴感、轻口播">
+                </label>
+                <div data-mode-field="design" class="design-save">
+                  <label>
+                    <span>新音色名称</span>
+                    <input id="designVoiceName" placeholder="例如：晚安故事女声">
+                  </label>
+                  <button id="saveDesignVoiceBtn" type="button">保存为新音色</button>
+                </div>
+                </div>
+
+              <!-- 卡片式音色选择 -->
+              <div class="voice-block">
+                <div class="voice-block-head">
+                  <h3>选择音色</h3>
+                </div>
+
+                <!-- 默认音色 -->
+                <div id="voiceTabPreset" class="voice-tab-panel">
+                  <div class="lang-row">
+                    <div class="lang-tabs" role="tablist" aria-label="语言">
+                      <button type="button" data-lang="zh" class="active">中文</button>
+                      <button type="button" data-lang="en">English</button>
+                    </div>
+                  </div>
+                  <div class="voice-cards-scroll">
+                    <div id="voiceCards" class="voice-cards"></div>
+                  </div>
+                  <p id="voiceSelectedBar" class="voice-selected-bar">未选择</p>
+                </div>
+
+                <!-- 克隆音色 -->
+                <div id="voiceTabClone" class="voice-tab-panel" hidden>
+                  <div class="voice-cards-scroll">
+                    <div id="cloneVoiceCards" class="voice-cards"></div>
+                  </div>
+                  <!-- 添加表单 -->
+                  <div id="cloneAddForm" class="clone-add-form" hidden>
+                    <input id="cloneAddName" placeholder="音色名称，如：小明的声音">
+                    <select id="cloneAddGender">
+                      <option value="female">女声</option>
+                      <option value="male">男声</option>
+                    </select>
+                    <div class="clone-file-pick" id="cloneFilePick">
+                      <span id="cloneFileName">点击选择音频文件（MP3 / WAV，≤10MB）</span>
+                      <input type="file" id="cloneAudioInput" accept="audio/mpeg,audio/mp3,audio/wav,.mp3,.wav" style="display:none">
+                    </div>
+                    <button type="button" id="cloneAddSaveBtn" class="primary">保存</button>
+                    <button type="button" id="cloneAddCancelBtn">取消</button>
+                  </div>
+                  <p id="cloneSelectedBar" class="voice-selected-bar">未选择</p>
+                </div>
+              </div>
+
+              <input id="selectedVoice" type="hidden">
+              <div class="test-grid">
+                <label>
+                  <span>格式</span>
+                  <select id="testFormat">
+                    <option value="mp3">mp3</option>
+                    <option value="wav">wav</option>
+                    <option value="pcm16">pcm16</option>
+                  </select>
+                </label>
+                <label class="speed-label">
+                  <span>语速 <output id="testSpeedValue">1.0</output></span>
+                  <input id="testSpeed" type="range" min="0.6" max="1.4" step="0.1" value="1">
+                </label>
+                <label class="wide"><span>文本</span><textarea id="testText" spellcheck="false">这是一次 MiMo TTS 试听。</textarea></label>
+                <div class="wide audio-row">
+                  <button type="submit" class="primary">生成试听</button>
+                  <audio id="testAudio" controls></audio>
+                </div>
+              </div>
+            </form>
+
+          </div>
+
+          <!-- 音色管理面板 -->
+          <div id="studioVoices" class="studio-panel" hidden>
+            <div class="voice-mgmt-toolbar">
+              <div class="voice-filters">
+                <input id="voiceFilter" placeholder="搜索名称 / Voice ID…" autocomplete="off" class="voice-filter-main">
+                <select id="voiceFilterLang" class="voice-filter-sel">
+                  <option value="">全部语言</option>
+                  <option value="zh">中文</option>
+                  <option value="en">English</option>
+                </select>
+                <select id="voiceFilterGender" class="voice-filter-sel">
+                  <option value="">全部性别</option>
+                  <option value="female">女声</option>
+                  <option value="male">男声</option>
+                </select>
+                <select id="voiceFilterModel" class="voice-filter-sel">
+                  <option value="">全部模型</option>
+                  <option value="standard">标准 TTS</option>
+                  <option value="design">声音设计</option>
+                  <option value="clone">声音克隆</option>
+                </select>
+              </div>
+              <div class="toolbar">
+                <label class="check voice-adv-toggle">
+                  <input id="showAdvancedCols" type="checkbox"><span>高级列</span>
+                </label>
+                <button id="addVoiceBtn" type="button">新增</button>
+                <button id="saveVoicesBtn" type="button">保存</button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th class="th-avatar"></th>
+                    <th>ID</th>
+                    <th>名称</th>
+                    <th>MiMo voice</th>
+                    <th class="col-advanced" hidden>模型</th>
+                    <th class="col-advanced" hidden>设计描述</th>
+                    <th>语言</th>
+                    <th>性别</th>
+                    <th class="col-advanced" hidden>标签</th>
+                    <th>排序</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="voiceRows"></tbody>
+              </table>
+            </div>
+
+            <!-- AI 情感分析（仅在音色管理 tab 内） -->
+            <div class="emotion-card">
+              <div class="emotion-card-head">
+                <div>
+                  <h3>AI 情感分析</h3>
+                  <p class="section-note">开启后每次合成自动注入角色设定与提示词，MiMo 理解情感并添加语音标签。</p>
+                </div>
+                <div class="emotion-card-actions">
+                  <label class="check emotion-toggle-inline">
+                    <input id="emotionEnabled" type="checkbox">
+                    <span>启用</span>
+                    <span id="emotionStatus" class="status">未启用</span>
+                  </label>
+                  <button type="button" id="toggleEmotionPrompts" class="btn-text">编辑提示词 ▾</button>
+                  <button type="button" id="saveEmotionBtn" class="primary">保存</button>
+                </div>
+              </div>
+              <div id="emotionPromptArea" class="emotion-prompt-area" hidden>
+                <div class="emotion-prompt-actions">
+                  <button type="button" id="loadEmotionDefaultsBtn">加载默认</button>
+                  <span class="muted" style="font-size:12px">留空时使用内置默认值</span>
+                </div>
+                <label style="display:grid;gap:5px;margin-top:10px">
+                  <span style="font-size:12px;color:var(--muted)">角色设定（System Prompt）</span>
+                  <textarea id="emotionSystemPrompt" style="min-height:72px" placeholder="留空使用默认：你是小说朗读导演…"></textarea>
+                </label>
+                <label style="display:grid;gap:5px;margin-top:10px">
+                  <span style="font-size:12px;color:var(--muted)">提示词模板（含 ${text} 占位符）</span>
+                  <textarea id="emotionUserTemplate" style="min-height:200px" placeholder="留空使用默认模板"></textarea>
+                </label>
+              </div>
+            </div>
+          </div><!-- /studioVoices -->
+        </section>
+
+      </main>
+    </div>
+
+    <div id="loginOverlay" class="login-overlay" hidden>
+      <div class="login-card">
+        <div class="login-icon">
+          <svg width="48" height="48" viewBox="0 0 32 32" fill="none">
+            <rect width="32" height="32" rx="8" fill="#4f6ef2"/>
+            <rect x="5" y="12" width="3" height="8" rx="1.5" fill="white"/>
+            <rect x="10" y="8" width="3" height="16" rx="1.5" fill="white"/>
+            <rect x="15" y="5" width="3" height="22" rx="1.5" fill="white"/>
+            <rect x="20" y="9" width="3" height="14" rx="1.5" fill="white"/>
+            <rect x="25" y="13" width="3" height="6" rx="1.5" fill="white"/>
+          </svg>
+        </div>
+        <h2>MiMo TTS 管理</h2>
+        <p>此页面已启用管理员保护，请输入管理 Token</p>
+        <form id="loginForm">
+          <input id="loginToken" type="password" placeholder="管理 Token" autocomplete="current-password">
+          <button type="submit" class="primary">登录</button>
+        </form>
+        <p id="loginError" class="login-error" hidden>Token 错误，请重试</p>
+      </div>
+    </div>
+
+    <!-- About Modal -->
+    <div id="aboutModal" class="modal-overlay" hidden>
+      <div class="modal-card">
+        <div class="modal-icon">
+          <svg viewBox="0 0 18 18" fill="none" width="32" height="32">
+            <rect x="1" y="6" width="2" height="6" rx="1" fill="white"/>
+            <rect x="5" y="3" width="2" height="12" rx="1" fill="white"/>
+            <rect x="9" y="1" width="2" height="16" rx="1" fill="white"/>
+            <rect x="13" y="4" width="2" height="10" rx="1" fill="white"/>
+            <rect x="17" y="7" width="1" height="4" rx="0.5" fill="white"/>
+          </svg>
+        </div>
+        <h2>MiMo TTS HTTP Proxy</h2>
+        <p>基于 MiMo TTS v2.5 API 的 HTTP 代理服务，为阅读类 App 提供 TTS 订阅源、音色管理、情感分析等功能。</p>
+        <div class="about-meta">
+          <span>模型支持：标准 · 声音设计 · 声音克隆</span>
+          <span>运行端口：<strong id="aboutPort">3000</strong></span>
+        </div>
+        <button type="button" id="closeAboutBtn" class="primary">关闭</button>
+      </div>
+    </div>
+
+    <div id="toast" role="status" aria-live="polite"></div>
+    <script src="/admin/app.js"></script>
+  </body>
+</html>

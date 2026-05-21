@@ -1,0 +1,14 @@
+services:
+  mimo-tts-proxy:
+    image: limairui/mimo-tts-proxy:latest
+    container_name: mimo-tts-proxy
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      DATA_DIR: /data
+      CACHE_DIR: /data/cache
+    volumes:
+      - ./data:/data

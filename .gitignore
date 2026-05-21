@@ -1,0 +1,8 @@
+node_modules/
+.env
+data/
+.idea/
+.claude/
+npm-debug.log*
+.DS_Store
+*.log

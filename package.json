@@ -1,0 +1,24 @@
+{
+  "name": "mimo-tts-http-proxy",
+  "version": "0.1.0",
+  "description": "Dockerized MiMo TTS HTTP proxy and Legado/Gedoor voice source generator.",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test:mimo": "node scripts/test-mimo.js"
+  },
+  "keywords": [
+    "mimo",
+    "tts",
+    "legado",
+    "gedoor",
+    "docker"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  }
+}
