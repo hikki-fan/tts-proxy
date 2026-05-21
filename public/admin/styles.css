@@ -1585,165 +1585,185 @@ td:last-child, th:last-child { width: 120px; }
 
 /* ─── H5 / Phone ──────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
-  /* Shell & Sidebar */
+  /* 防止水平溢出 */
+  html, body { overflow-x: hidden; }
+
+  /* Shell */
   .shell { grid-template-columns: 1fr; }
 
+  /* ── 底部固定导航栏 ── */
   .sidebar {
     flex-direction: row;
     position: fixed;
-    bottom: 0; left: 0; right: 0;
-    top: auto;
-    height: auto;
+    bottom: 0; left: 0; right: 0; top: auto;
+    height: 60px;
     width: 100%;
     border-right: none;
     border-top: 1.5px solid var(--line);
-    padding: 8px 12px;
+    padding: 0 8px;
     gap: 0;
     box-shadow: 0 -4px 16px rgba(13,21,38,0.08);
     z-index: 200;
     overflow: visible;
+    align-items: stretch;
   }
 
-  .sidebar-logo { display: none; }
-
-  .sidebar-brand-text { display: none; }
+  .sidebar-logo,
+  .sidebar-brand-text,
+  .sidebar-bottom { display: none; }
 
   .nav {
     flex-direction: row;
     justify-content: space-around;
+    align-items: stretch;
     flex: 1;
     gap: 0;
   }
 
   .nav a {
-    width: 48px; height: 44px;
-    border-radius: 12px;
+    flex: 1;
+    width: auto; height: 100%;
+    border-radius: 0;
     flex-direction: column;
-    gap: 2px;
+    justify-content: center;
+    gap: 3px;
+    border: none;
+    background: transparent;
   }
 
-  .nav a svg { width: 20px; height: 20px; }
+  .nav a svg { width: 20px; height: 20px; flex-shrink: 0; }
 
-  /* 手机 tab 下方显示文字标签 */
-  .nav a::before {
-    content: attr(data-label);
+  .nav-label {
+    max-width: none !important;
+    opacity: 1 !important;
     font-size: 10px;
     font-weight: 600;
-    color: inherit;
-    order: 2;
-    display: block;
+    display: block !important;
   }
 
   .nav a.active {
-    background: var(--accent-soft);
     color: var(--accent);
+    background: transparent;
     box-shadow: none;
+    border-top: 2px solid var(--accent);
   }
 
-  .sidebar-bottom { display: none; }
+  /* ── 主内容区留出底部导航高度 ── */
+  .main { padding: 14px 12px 72px; }
 
-  /* Main area leaves space for fixed bottom nav */
-  .main {
-    padding: 14px 12px 80px;
-  }
-
-  /* Topbar */
-  h1 { font-size: 17px; }
-  #baseUrl { font-size: 11px; }
-
+  /* ── Topbar ── */
   .topbar {
     flex-direction: column;
     gap: 8px;
+    align-items: flex-start;
     margin-bottom: 12px;
   }
 
-  .toolbar { flex-wrap: nowrap; gap: 6px; }
+  h1 { font-size: 18px; }
+  #baseUrl { font-size: 11px; }
 
-  /* Sections */
-  .section { padding: 14px 14px; border-radius: 10px; margin-top: 10px; }
+  .toolbar {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .status { font-size: 11px; padding: 2px 8px; }
+
+  /* ── Sections ── */
+  .section { padding: 14px; border-radius: 10px; margin-top: 10px; }
   .section::before { display: none; }
 
-  /* Metrics */
-  .metrics {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-    margin-bottom: 12px;
-  }
-
+  /* ── Metrics ── */
+  .metrics { grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px; }
   .metric { padding: 10px 12px; }
   .metric strong { font-size: 18px; }
 
-  /* Endpoint grid */
+  /* ── Grids all single-column ── */
   .endpoint-grid, .test-grid, .settings-grid { grid-template-columns: 1fr; }
 
-  /* Mode cards: row on phone */
-  .mode-grid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
+  /* ── Host-port row: 两行布局 ── */
+  .host-port-row {
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    grid-template-rows: auto auto;
+    gap: 6px;
+    align-items: center;
   }
 
-  .mode-card {
-    min-height: 72px;
-    padding: 10px 10px;
-    gap: 5px;
+  .host-port-row select { grid-column: 1; }
+  .host-port-row input:not(.port-input) { grid-column: 2; }
+  .host-port-row .port-sep { display: none; }
+  .host-port-row .port-input {
+    grid-column: 1 / -1;
+    width: 100%;
+    flex: none;
   }
 
+  /* ── Mode cards: 3列紧凑 ── */
+  .mode-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .mode-card { min-height: 68px; padding: 10px 8px; gap: 4px; }
   .mode-card small { display: none; }
-  .mode-icon { width: 26px; height: 26px; font-size: 11px; }
+  .mode-icon { width: 24px; height: 24px; font-size: 11px; }
+  .mode-card strong { font-size: 12px; }
 
-  /* Voice cards */
+  /* ── Voice cards ── */
   .voice-cards-scroll { padding: 4px 0 10px; }
-
-  .voice-card { min-width: 64px; padding: 10px 6px 8px; }
+  .voice-card { min-width: 62px; padding: 10px 6px 8px; }
   .voice-avatar { width: 36px; height: 36px; font-size: 14px; }
-  .voice-card-name { font-size: 11px; max-width: 56px; }
+  .voice-card-name { font-size: 11px; max-width: 54px; }
   .voice-card-lang { font-size: 9px; }
 
-  /* Studio tabs */
-  .studio-tabs-bar {
-    margin: -14px -14px 14px;
-    padding: 0 14px;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
+  /* ── Studio tabs ── */
+  .studio-tabs-bar { margin: -14px -14px 14px; padding: 0 14px; overflow-x: auto; }
   .studio-tab { padding: 10px 12px; font-size: 12px; }
+  .studio-state { display: none; }
 
-  /* Stats */
-  .stats-totals { gap: 8px; }
-  .stat-total { min-width: 100px; padding: 8px 12px; }
-  .stat-total strong { font-size: 18px; }
+  /* ── Stats ── */
+  .stats-totals { gap: 8px; flex-wrap: nowrap; }
+  .stat-total { min-width: 90px; padding: 8px 10px; flex: 1; }
+  .stat-total strong { font-size: 17px; }
+  .stat-model-legend { gap: 8px; }
+  .model-legend-item { font-size: 11px; }
 
-  /* Test grid */
-  .audio-row { flex-wrap: wrap; }
+  /* ── Test ── */
+  .audio-row { flex-wrap: wrap; gap: 8px; }
   audio { width: 100%; }
+  .test-grid textarea { min-height: 80px; }
 
-  /* Emotion card */
-  .emotion-card-head { flex-direction: column; gap: 10px; }
+  /* ── Emotion card ── */
+  .emotion-card-head { flex-direction: column; gap: 8px; }
   .emotion-card-actions { flex-wrap: wrap; gap: 6px; }
 
-  /* Voice mgmt toolbar */
+  /* ── Voice management ── */
   .voice-mgmt-toolbar { flex-direction: column; gap: 8px; }
   .voice-filters { flex-wrap: wrap; }
-  .voice-filter-main { max-width: none; }
+  .voice-filter-main, .voice-filter-sel { width: 100%; flex: none; }
 
-  /* Login card */
-  .login-card { padding: 28px 20px; }
+  /* ── Table ── */
+  .table-wrap { font-size: 12px; }
 
-  /* Toast */
-  #toast { left: 12px; right: 12px; bottom: 76px; max-width: none; }
-
-  /* Lang tabs */
-  .lang-tabs { grid-template-columns: repeat(2, 1fr); }
-
-  /* Clone add form */
+  /* ── Clone ── */
   .clone-add-form { flex-direction: column; }
-  .clone-file-pick { min-width: auto; }
+  .clone-file-pick { min-width: auto; width: 100%; }
 
-  /* About modal */
-  .modal-card { padding: 28px 20px; }
+  /* ── Lang tabs ── */
+  .lang-tabs { width: 100%; }
 
-  /* Host port row */
-  .host-port-row { flex-wrap: wrap; }
-  .host-port-row .port-input { flex: 0 0 80px; }
+  /* ── Copy line ── */
+  .copy-line { flex-wrap: nowrap; }
+  .copy-line input { min-width: 0; font-size: 12px; }
+  .copy-line button { flex-shrink: 0; }
+
+  /* ── Login / Modal ── */
+  .login-card { padding: 28px 20px; }
+  .modal-card { padding: 28px 18px; }
+
+  /* ── Toast ── */
+  #toast { left: 12px; right: 12px; bottom: 68px; max-width: none; }
+
+  /* ── Composer head ── */
+  .composer-head { flex-direction: column; gap: 10px; }
+  .model-picker { min-width: 0; width: 100%; }
 }
