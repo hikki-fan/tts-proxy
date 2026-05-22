@@ -302,6 +302,28 @@ function bindEvents() {
   $('#reloadSourceBtn').addEventListener('click', loadSourcePreview);
   $('#legacyToggle').addEventListener('change', loadSourcePreview);
   $('#copySourceJsonBtn').addEventListener('click', () => copyText(state.sourceJson));
+  $('#downloadSourceBtn').addEventListener('click', downloadSourceJson);
+
+  // QR 按钮（事件委托）
+  document.body.addEventListener('click', (e) => {
+    const qrBtn = e.target.closest('.qr-btn');
+    if (qrBtn) {
+      const inputId = qrBtn.dataset.qr;
+      const label = qrBtn.dataset.qrLabel || '订阅源';
+      const url = document.getElementById(inputId)?.value?.trim();
+      if (url) showQrModal(url, label);
+      return;
+    }
+  });
+
+  // QR 弹窗关闭
+  document.getElementById('closeQrBtn').addEventListener('click', () => {
+    document.getElementById('qrModal').hidden = true;
+  });
+  document.getElementById('qrModal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) e.currentTarget.hidden = true;
+  });
+  document.getElementById('downloadQrBtn').addEventListener('click', downloadQrImage);
   $('#testForm').addEventListener('submit', runTest);
   $('#testSpeed').addEventListener('input', () => {
     $('#testSpeedValue').textContent = Number($('#testSpeed').value).toFixed(1);
@@ -1395,15 +1417,20 @@ async function saveDesignVoice() {
 
 function collectVoices() {
   return Array.from($('#voiceRows').querySelectorAll('tr')).map((row, index) => {
-    const value = (field) => row.querySelector(`[data-field="${field}"]`).value.trim();
+    const value = (field) => {
+      const el = row.querySelector(`[data-field="${field}"]`);
+      return el ? el.value.trim() : '';
+    };
     const existing = state.voices.find((voice) => voice.id === value('id')) || {};
+    const voiceId = value('voice');
+    const model = value('model');
     return {
       id: value('id'),
       name: value('name'),
-      voice: value('voice'),
+      voice: voiceId,
       language: value('language') || 'zh',
       gender: value('gender') || 'female',
-      model: value('model'),
+      model,
       voiceDescription: value('voiceDescription'),
       badge: value('badge'),
       description: existing.description || '',
@@ -1574,6 +1601,75 @@ function formatBytes(bytes) {
     unit += 1;
   }
   return `${value.toFixed(value >= 10 || unit === 0 ? 0 : 1)} ${units[unit]}`;
+}
+
+/* ─── QR Code ────────────────────────────────────────────────────────────── */
+
+function showQrModal(url, label) {
+  document.getElementById('qrModalTitle').textContent = `扫码${label ? ' · ' + label : ''}`;
+  document.getElementById('qrModalUrl').textContent = url;
+
+  const wrap = document.getElementById('qrImgWrap');
+  wrap.innerHTML = '<div class="qr-loading">生成中…</div>';
+  document.getElementById('qrModal').hidden = false;
+
+  // 用 Google Charts API 生成 QR（客户端直接请求，无需服务端依赖）
+  const qrSrc = `https://chart.googleapis.com/chart?chs=280x280&cht=qr&chl=${encodeURIComponent(url)}&choe=UTF-8&chld=M|2`;
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = () => {
+    wrap.innerHTML = '';
+    img.className = 'qr-img';
+    wrap.appendChild(img);
+  };
+  img.onerror = () => {
+    // fallback: qrserver.com
+    const img2 = new Image();
+    img2.className = 'qr-img';
+    img2.src = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(url)}&margin=10`;
+    img2.onload = () => { wrap.innerHTML = ''; wrap.appendChild(img2); };
+    img2.onerror = () => { wrap.innerHTML = '<p style="color:var(--muted);font-size:13px">二维码加载失败，请检查网络</p>'; };
+  };
+  img.src = qrSrc;
+}
+
+function downloadQrImage() {
+  const img = document.querySelector('#qrImgWrap img');
+  if (!img) { toast('二维码尚未加载完成'); return; }
+  const canvas = document.createElement('canvas');
+  canvas.width = img.naturalWidth || 280;
+  canvas.height = img.naturalHeight || 280;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0);
+  const a = document.createElement('a');
+  a.download = 'mimo-tts-qrcode.png';
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+}
+
+/* ─── Subscription Download ─────────────────────────────────────────────── */
+
+async function downloadSourceJson() {
+  try {
+    const legacy = $('#legacyToggle')?.checked;
+    const url = `/api/reader/tts-configs${legacy ? '?legacy=1' : ''}`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const json = await response.json();
+    const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `mimo-tts-sources${legacy ? '-legacy' : ''}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+    toast('订阅源 JSON 已下载');
+  } catch (err) {
+    toast(err.message);
+  }
 }
 
 function escapeHtml(value) {

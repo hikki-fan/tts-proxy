@@ -10,7 +10,7 @@ services:
       - PUBLIC_BASE_URL=   # 填入对外访问地址，如 https://tts.hikki.plus:7777
       - DATA_DIR=/data
       - CACHE_DIR=/data/cache
-      # 可选项（留空则使用默认值）
+      # ── 可选项（留空则使用默认值）───────────────────────────────────
       # - DEFAULT_VOICE=mimo_default
       # - DEFAULT_FORMAT=mp3
       # - DEFAULT_SPEED=1

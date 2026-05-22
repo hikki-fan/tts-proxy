@@ -1338,6 +1338,82 @@ td:last-child, th:last-child { width: 120px; }
 
 .voice-filter-bar input { flex: 1; max-width: 280px; }
 
+/* ─── QR Button ──────────────────────────────────────────────────────────── */
+
+.qr-btn {
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  border-radius: var(--radius-xs);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: var(--bg);
+  border-color: var(--line);
+  color: var(--muted);
+  box-shadow: none;
+}
+
+.qr-btn svg { width: 16px; height: 16px; }
+
+.qr-btn:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: none;
+}
+
+/* ─── QR Modal ───────────────────────────────────────────────────────────── */
+
+.qr-card {
+  align-items: center;
+  gap: 16px;
+  width: min(340px, calc(100vw - 32px));
+}
+
+.qr-card h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.qr-img-wrap {
+  width: 240px;
+  height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.qr-img { width: 220px; height: 220px; display: block; }
+
+.qr-loading {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.qr-url-text {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+  word-break: break-all;
+  max-width: 100%;
+  padding: 0 4px;
+}
+
+.qr-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  justify-content: center;
+}
+
 /* ─── Topbar Icon Actions ────────────────────────────────────────────────── */
 
 .topbar-actions {
