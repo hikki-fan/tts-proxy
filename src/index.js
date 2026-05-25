@@ -4,7 +4,7 @@ const path = require('node:path');
 const { config, saveVoices, saveSettings, getSettingsView } = require('./config');
 const { AudioCache, cacheKey } = require('./cache');
 const { MimoClient } = require('./mimoClient');
-const { GeminiClient, GEMINI_NARRATION_PROMPT, GEMINI_USER_TEXT_PREFIX } = require('./geminiClient');
+const { GeminiClient, GEMINI_LIVE_MODELS, GEMINI_NARRATION_PROMPT, GEMINI_USER_TEXT_PREFIX, makeStreamingWavHeader } = require('./geminiClient');
 const {
   decodeMaybeEncoded,
   normalizeFormat,
@@ -149,6 +149,7 @@ app.get('/api/admin/config', assertAdmin, async (req, res, next) => {
         mimoModel: config.mimoModel,
         geminiConfigured: Boolean(config.geminiApiKey),
         geminiModel: config.geminiModel,
+        geminiModels: GEMINI_LIVE_MODELS,
         accessTokenEnabled: Boolean(config.accessToken),
         adminProtected: Boolean(config.adminToken),
         adminTokenConfigured: Boolean(config.adminToken),
@@ -306,9 +307,31 @@ app.post('/api/admin/cache/clear', assertAdmin, async (req, res, next) => {
   }
 });
 
+app.get('/api/admin/cache/list', assertAdmin, async (req, res, next) => {
+  try {
+    const entries = await cache.list();
+    res.json({ ok: true, entries, cache: await cache.stats() });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/admin/cache/delete', assertAdmin, async (req, res, next) => {
+  try {
+    const keys = req.body?.keys;
+    if (!Array.isArray(keys) || keys.length === 0) {
+      return res.status(400).json({ error: 'keys must be a non-empty array' });
+    }
+    await cache.deleteEntries(keys);
+    res.json({ ok: true, deleted: keys.length, cache: await cache.stats() });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post('/api/admin/test-tts', assertAdmin, async (req, res, next) => {
   try {
-    await synthesizeAndSend(req.body || {}, res, { emotion: config.emotionEnabled, log: config.logEnabled });
+    await synthesizeAndSend(req.body || {}, res, { emotion: config.emotionEnabled, log: config.logEnabled, clientId: getClientId(req) });
   } catch (error) {
     next(error);
   }
@@ -317,7 +340,7 @@ app.post('/api/admin/test-tts', assertAdmin, async (req, res, next) => {
 app.get('/api/tts', async (req, res, next) => {
   try {
     assertAccess(req);
-    await synthesizeAndSend(req.query, res, { log: config.logEnabled, emotion: config.emotionEnabled });
+    await synthesizeAndSend(req.query, res, { log: config.logEnabled, emotion: config.emotionEnabled, clientId: getClientId(req) });
   } catch (error) {
     next(error);
   }
@@ -408,7 +431,7 @@ async function synthesizeAndSend(params, res, opts = {}) {
     userMessage,
     model,
     emotionEnabled,
-    geminiNarrationPrompt: provider === 'gemini' ? `${GEMINI_NARRATION_PROMPT}\n${GEMINI_USER_TEXT_PREFIX}` : '',
+    geminiNarrationPrompt: provider === 'gemini' ? `${GEMINI_NARRATION_PROMPT}\n${GEMINI_USER_TEXT_PREFIX}\nspeed=${speed}` : '',
     emotionSystemPrompt: emotionEnabled ? (config.emotionSystemPrompt || DEFAULT_SYSTEM_PROMPT) : '',
     emotionUserTemplate: emotionEnabled ? (config.emotionUserTemplate || DEFAULT_USER_TEMPLATE) : ''
   };
@@ -441,16 +464,25 @@ async function synthesizeAndSend(params, res, opts = {}) {
 
   let audio, actualFormat;
   if (provider === 'gemini') {
-    ({ audio, format: actualFormat } = await gemini.synthesize({ text, voice, format, model }));
+    // WAV 格式启用流式响应：首帧 PCM 到达即开始推送，无需等待完整生成
+    if (format !== 'mp3') {
+      return await synthesizeGeminiStream({ gemini, text, voice, format, model, speed, clientId: opts.clientId, res, cache, key, startMs, opts, logger });
+    }
+    ({ audio, format: actualFormat } = await gemini.synthesize({ text, voice, format, model, speed, clientId: opts.clientId }));
   } else {
     audio = await mimo.synthesize({ text, voice, format, userMessage, model, emotion, cloneAudioData });
     actualFormat = format;
   }
-  await cache.set(key, actualFormat, audio);
+  await cache.set(key, actualFormat, audio, { provider, voice, model, chars: text.length, textPreview: text.slice(0, 80) });
   const dur = Date.now() - startMs;
   console.log(`[TTS]  ${new Date().toISOString()} SYNTH      provider=${provider} voice=${voice} chars=${text.length} format=${actualFormat} ${dur}ms`);
   if (opts.log) logger.logTtsCall({ chars: text.length, provider, voice, format: actualFormat, model, cached: false, duration: dur });
   return sendAudio(res, audio, actualFormat, false);
+}
+
+function getClientId(req) {
+  const forwarded = String(req.get('x-forwarded-for') || '').split(',')[0].trim();
+  return forwarded || req.ip || req.socket?.remoteAddress || 'local';
 }
 
 function validateVoices(voices) {
@@ -498,7 +530,8 @@ function validateVoices(voices) {
       badge: String(voice.badge || '').trim(),
       color: String(voice.color || '').trim(),
       order: Number.isFinite(order) ? order : index + 1,
-      cloneAudioFile: existing?.cloneAudioFile || ''
+      cloneAudioFile: existing?.cloneAudioFile || '',
+      inSubscription: voice.inSubscription !== false
     };
 
     if (record.model && getModelMode(record.model) === 'design' && !record.voiceDescription) {
@@ -666,6 +699,44 @@ function sendAudio(res, audio, format, cached) {
     'X-Cache': cached ? 'HIT' : 'MISS'
   });
   res.send(audio);
+}
+
+async function synthesizeGeminiStream({ gemini, text, voice, format, model, speed, clientId, res, cache, key, startMs, opts, logger }) {
+  let headerSent = false;
+
+  // onPcmChunk：每当 Gemini 推来一帧 PCM，立即写入 HTTP 响应
+  const onPcmChunk = (chunk) => {
+    if (res.writableEnded) return;
+    if (!headerSent) {
+      headerSent = true;
+      res.set({
+        'Content-Type': 'audio/wav',
+        'Transfer-Encoding': 'chunked',
+        'Cache-Control': 'public, max-age=31536000, immutable',
+        'X-Cache': 'MISS'
+      });
+      res.write(makeStreamingWavHeader());
+    }
+    res.write(chunk);
+  };
+
+  try {
+    // synthesize 内部调用 onPcmChunk 流式推块，完成后返回完整 WAV 用于缓存
+    const { audio, format: actualFormat } = await gemini.synthesize({ text, voice, format, model, speed, clientId, onPcmChunk });
+    const dur = Date.now() - startMs;
+
+    if (!res.writableEnded) res.end();
+
+    // 后台缓存（不阻塞响应，失败静默忽略）
+    cache.set(key, actualFormat, audio, { provider: 'gemini', voice, model, chars: text.length, textPreview: text.slice(0, 80) }).catch(() => {});
+
+    console.log(`[TTS]  ${new Date().toISOString()} STREAM     provider=gemini voice=${voice} chars=${text.length} format=${actualFormat} ${dur}ms`);
+    if (opts.log) logger.logTtsCall({ chars: text.length, provider: 'gemini', voice, format: actualFormat, model, cached: false, duration: dur });
+  } catch (err) {
+    if (!res.headersSent) throw err;
+    if (!res.writableEnded) res.end();
+    console.error(`[Gemini] Stream error after headers sent: ${err.message}`);
+  }
 }
 
 function safeVoice(voice) {

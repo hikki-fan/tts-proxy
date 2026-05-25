@@ -72,7 +72,7 @@ function makeVoiceSource(origin, voice, options) {
 function makeVoiceSources(req, config, options = {}) {
   const origin = getOrigin(req, config.publicBaseUrl);
   return config.voices
-    .slice()
+    .filter(v => v.inSubscription !== false)
     .sort((a, b) => a.order - b.order)
     .map((voice) => makeVoiceSource(origin, voice, {
       accessToken: config.accessToken,

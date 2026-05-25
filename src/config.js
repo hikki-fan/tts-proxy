@@ -47,7 +47,8 @@ function normalizeVoices(voices) {
     color: String(voice.color || ''),
     order: Number.isFinite(Number(voice.order)) ? Number(voice.order) : index + 1,
     provider: String(voice.provider || 'mimo'),
-    cloneAudioFile: String(voice.cloneAudioFile || '')
+    cloneAudioFile: String(voice.cloneAudioFile || ''),
+    inSubscription: voice.inSubscription !== false
   }));
 }
 

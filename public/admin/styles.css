@@ -542,6 +542,60 @@ h4 { font-size: 13px; font-weight: 600; }
   gap: 14px;
 }
 
+/* ─── Voice Management Section (studioTest) ─────────────────────────────── */
+
+.voice-mgmt-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1.5px solid var(--line);
+}
+
+/* ─── Settings Tab Cards ─────────────────────────────────────────────────── */
+
+.settings-tabs-nav {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.settings-tab-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--line);
+  background: var(--bg);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s, transform 0.15s;
+  text-align: left;
+  min-height: auto;
+  box-shadow: var(--shadow-xs);
+}
+
+.settings-tab-card:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 12px rgba(79,110,242,0.12);
+}
+
+.settings-tab-card.active {
+  border-color: var(--accent);
+  background: var(--panel);
+  box-shadow: 0 0 0 3px rgba(79,110,242,0.12), var(--shadow-sm);
+  transform: none;
+}
+
+.stc-icon { color: var(--accent); margin-bottom: 2px; }
+.stc-icon svg { width: 18px; height: 18px; display: block; }
+.stc-title { font-size: 14px; font-weight: 700; color: var(--text); }
+.stc-desc { font-size: 11px; color: var(--muted); font-weight: 400; }
+
+.settings-panel { padding-top: 2px; }
+
 .wide { grid-column: 1 / -1; }
 
 /* ─── Copy Line ───────────────────────────────────────────────────────────── */
@@ -1162,6 +1216,152 @@ td:last-child, th:last-child { width: 120px; }
   box-shadow: 0 2px 8px rgba(220,38,38,0.15);
 }
 
+/* ─── Subscription Voice Selection ──────────────────────────────────────── */
+
+.sub-voices-wrap {
+  margin-top: 18px;
+  border-top: 1.5px solid var(--line);
+  padding-top: 16px;
+}
+
+.sub-voices-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  gap: 12px;
+}
+
+.sub-voices-head h3 { margin: 0 0 2px; font-size: 14px; font-weight: 600; }
+
+.sub-voice-list { display: grid; gap: 14px; }
+
+.sub-voice-group-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 8px;
+}
+
+.sub-voice-items { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.sub-voice-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: var(--radius-xs);
+  background: var(--bg);
+  border: 1.5px solid var(--line);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  user-select: none;
+}
+
+.sub-voice-item:hover { border-color: var(--accent); background: var(--accent-soft); }
+
+.sub-voice-item input[type="checkbox"] {
+  width: auto; height: auto; flex-shrink: 0;
+  accent-color: var(--accent);
+  box-shadow: none;
+}
+
+.sub-voice-name { font-size: 13px; font-weight: 500; }
+.sub-voice-lang { font-size: 11px; color: var(--muted); }
+
+/* ─── Inline QR Code ─────────────────────────────────────────────────────── */
+
+.qr-inline-wrap {
+  margin-top: 8px;
+  width: 128px;
+  height: 128px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow: var(--shadow-xs);
+}
+
+.qr-inline-img {
+  width: 116px;
+  height: 116px;
+  display: block;
+  image-rendering: pixelated;
+}
+
+.qr-inline-loading,
+.qr-inline-error {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  padding: 8px;
+  line-height: 1.4;
+}
+
+.qr-inline-error { color: var(--warn); }
+
+/* ─── Cache Detail ────────────────────────────────────────────────────────── */
+
+.cache-detail-wrap { margin-top: 18px; border-top: 1.5px solid var(--line); padding-top: 16px; }
+
+.cache-detail-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.cache-detail-head h3 { margin: 0 0 2px; font-size: 14px; font-weight: 600; }
+
+.cache-detail-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+}
+
+.cache-detail-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.cache-detail-table th {
+  background: var(--bg);
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: .04em;
+  padding: 7px 10px;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--line);
+}
+.cache-detail-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cache-detail-table tr:last-child td { border-bottom: none; }
+.cache-detail-table tr.selected td { background: var(--accent-soft); }
+.cache-detail-table td.td-preview {
+  max-width: 260px;
+  color: var(--muted);
+  font-style: italic;
+}
+.th-check { width: 34px; }
+.cache-detail-table tbody tr:hover td { background: var(--bg); }
+.cache-detail-table tbody tr.selected:hover td { background: var(--accent-soft); }
+.cache-detail-empty { padding: 28px; text-align: center; color: var(--muted); font-size: 13px; }
+
 /* ─── Source Preview ──────────────────────────────────────────────────────── */
 
 .source-preview-wrap { margin-top: 18px; border-top: 1.5px solid var(--line); padding-top: 16px; }
@@ -1396,6 +1596,14 @@ td:last-child, th:last-child { width: 120px; }
   border-color: var(--accent);
   color: var(--accent);
   transform: none;
+}
+
+.qr-btn-active,
+.qr-btn-active:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(79,110,242,0.18);
 }
 
 /* ─── QR Modal ───────────────────────────────────────────────────────────── */
@@ -1695,6 +1903,10 @@ td:last-child, th:last-child { width: 120px; }
   .metrics, .endpoint-grid, .test-grid, .settings-grid, .mode-fields {
     grid-template-columns: 1fr;
   }
+
+  .settings-tabs-nav { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .settings-tab-card { padding: 10px 12px; }
+  .stc-desc { display: none; }
 
   .design-save { grid-template-columns: 1fr; }
   .mode-grid { grid-template-columns: 1fr; }

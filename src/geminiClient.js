@@ -3,6 +3,10 @@ const tls = require('node:tls');
 const { spawn } = require('node:child_process');
 
 const DEFAULT_MODEL = 'gemini-2.5-flash-native-audio-preview-12-2025';
+const GEMINI_LIVE_MODELS = [
+  { id: 'gemini-3.1-flash-live-preview',              name: 'Gemini 3.1 Flash Live（最新）' },
+  { id: 'gemini-2.5-flash-native-audio-preview-12-2025', name: 'Gemini 2.5 Flash Native Audio' }
+];
 const GEMINI_NARRATION_PROMPT = [
   '一位温柔沉稳的年轻男性叙述者，约30岁，操一口标准普通话，语速稍快，声音清晰且富有磁性，但又不显得过于低沉。',
   '严格阅读原文，不得进行解释、总结或扩展。',
@@ -21,20 +25,27 @@ const LIVE_SAMPLE_RATE = 24000;
 const LIVE_CHANNELS = 1;
 const LIVE_BIT_DEPTH = 16;
 const MAX_WS_CONNECTION_MS = 8 * 60 * 1000;
+const WS_IDLE_TTL_MS = 10 * 60 * 1000;
+const SESSION_PREWARM_AT_MS = 13 * 60 * 1000;
 const DEFAULT_CHUNK_CHARS = 1200;
 
 class GeminiClient {
   constructor(options) {
+    this.sessions = new Map();
+    this.warming = new Map();
     this.update(options);
   }
 
   update(options = {}) {
+    const apiKeyChanged = Object.prototype.hasOwnProperty.call(options, 'apiKey') && options.apiKey !== this.apiKey;
+    const modelChanged = Object.prototype.hasOwnProperty.call(options, 'model') && options.model !== this.model;
+    if (apiKeyChanged || modelChanged) this.closeAllSessions();
     if (Object.prototype.hasOwnProperty.call(options, 'apiKey')) this.apiKey = options.apiKey;
     if (Object.prototype.hasOwnProperty.call(options, 'model')) this.model = options.model;
     if (Object.prototype.hasOwnProperty.call(options, 'timeoutMs')) this.timeoutMs = options.timeoutMs;
   }
 
-  async synthesize({ text, voice, format = 'wav', model: modelOverride = '' }) {
+  async synthesize({ text, voice, format = 'wav', model: modelOverride = '', speed = '1', clientId = 'default', onPcmChunk }) {
     if (!this.apiKey) {
       throw Object.assign(new Error('GEMINI_API_KEY is not configured'), { statusCode: 500 });
     }
@@ -49,15 +60,8 @@ class GeminiClient {
 
     for (let index = 0; index < chunks.length; index += 1) {
       const chunk = chunks[index];
-      const chunkPcm = await synthesizeChunkViaLive({
-        apiKey: this.apiKey,
-        model,
-      voiceName,
-      text: chunk,
-      timeoutMs: Math.min(timeoutMs, MAX_WS_CONNECTION_MS),
-      chunkIndex: index + 1,
-      chunkCount: chunks.length
-      });
+      const session = this.getSession({ model, voiceName, speed, timeoutMs, clientId });
+      const chunkPcm = await session.synthesize(chunk, onPcmChunk);
       pcmChunks.push(chunkPcm);
     }
 
@@ -74,9 +78,336 @@ class GeminiClient {
     console.log(`[Gemini] ${new Date().toISOString()} Live model=${model} voice=${voiceName} chunks=${chunks.length} format=wav ${Date.now() - start}ms OK`);
     return { audio: wav, format: 'wav' };
   }
+
+  getSession({ model, voiceName, speed, timeoutMs, clientId }) {
+    const key = [
+      String(clientId || 'default'),
+      this.apiKey ? crypto.createHash('sha256').update(this.apiKey).digest('hex').slice(0, 12) : '',
+      model,
+      voiceName,
+      speed
+    ].join('|');
+    const existing = this.sessions.get(key);
+    if (existing && !existing.closed) {
+      existing.timeoutMs = timeoutMs;
+      return existing;
+    }
+    // 旧 session 已关闭，检查是否有预热好的 session 可直接接管
+    const warmed = this.warming.get(key);
+    if (warmed && !warmed.closed) {
+      this.warming.delete(key);
+      warmed.timeoutMs = timeoutMs;
+      warmed.onClose = () => this.sessions.delete(key);
+      warmed.onNearExpiry = () => this._prewarm(key, { model, voiceName, speed, timeoutMs });
+      this.sessions.set(key, warmed);
+      console.log(`[Gemini] Pre-warmed session promoted for key=${key.split('|')[0]}`);
+      return warmed;
+    }
+    this.warming.delete(key);
+    const session = new GeminiLiveSession({
+      apiKey: this.apiKey,
+      model,
+      voiceName,
+      speed,
+      timeoutMs,
+      onClose: () => this.sessions.delete(key),
+      onNearExpiry: () => this._prewarm(key, { model, voiceName, speed, timeoutMs })
+    });
+    this.sessions.set(key, session);
+    return session;
+  }
+
+  _prewarm(key, { model, voiceName, speed, timeoutMs }) {
+    if (this.warming.has(key)) return;
+    const session = new GeminiLiveSession({
+      apiKey: this.apiKey,
+      model,
+      voiceName,
+      speed,
+      timeoutMs,
+      onClose: () => {
+        if (this.warming.get(key) === session) this.warming.delete(key);
+      }
+    });
+    this.warming.set(key, session);
+    console.log(`[Gemini] Pre-warming session for key=${key.split('|')[0]}`);
+    session.connect().catch((err) => {
+      console.warn(`[Gemini] Pre-warm connect failed: ${err.message}`);
+      if (this.warming.get(key) === session) this.warming.delete(key);
+    });
+  }
+
+  closeAllSessions() {
+    for (const session of this.sessions.values()) session.close();
+    for (const session of this.warming.values()) session.close();
+    this.sessions.clear();
+    this.warming.clear();
+  }
 }
 
-function synthesizeChunkViaLive({ apiKey, model, voiceName, text, timeoutMs, chunkIndex, chunkCount }) {
+class GeminiLiveSession {
+  constructor({ apiKey, model, voiceName, speed, timeoutMs, onClose, onNearExpiry }) {
+    this.apiKey = apiKey;
+    this.model = model;
+    this.voiceName = voiceName;
+    this.speed = speed;
+    this.timeoutMs = timeoutMs;
+    this.onClose = onClose;
+    this.onNearExpiry = onNearExpiry;
+    this.buffer = Buffer.alloc(0);
+    this.handshaken = false;
+    this.setupDone = false;
+    this.closed = false;
+    this.queue = Promise.resolve();
+    this.current = null;
+    this.connectPromise = null;
+    this.idleTimer = null;
+    this.prewarmTimer = null;
+    this.createdAt = Date.now();
+  }
+
+  synthesize(text, onChunk) {
+    this.queue = this.queue.then(() => this.runTurn(text, onChunk));
+    return this.queue;
+  }
+
+  async runTurn(text, onChunk) {
+    await this.connect();
+    this.clearIdleTimer();
+    return new Promise((resolve, reject) => {
+      const request = {
+        text,
+        chunks: [],
+        onChunk: typeof onChunk === 'function' ? onChunk : null,
+        resolve: (pcm) => {
+          clearTimeout(request.timer);
+          this.current = null;
+          this.armIdleTimer();
+          resolve(pcm);
+        },
+        reject: (err) => {
+          clearTimeout(request.timer);
+          this.current = null;
+          this.close();
+          reject(err);
+        },
+        timer: null
+      };
+      request.timer = setTimeout(() => {
+        request.reject(Object.assign(new Error('Gemini Live API request timed out'), { statusCode: 504 }));
+      }, Math.min(this.timeoutMs || 120000, MAX_WS_CONNECTION_MS));
+      this.current = request;
+      sendJson(this.socket, {
+        clientContent: {
+          turns: [{
+            role: 'user',
+            parts: [{ text: `${GEMINI_USER_TEXT_PREFIX}${text}${GEMINI_USER_TEXT_SUFFIX}` }]
+          }],
+          turnComplete: true
+        }
+      });
+    });
+  }
+
+  connect() {
+    if (this.setupDone && this.socket && !this.closed) return Promise.resolve();
+    if (this.connectPromise) return this.connectPromise;
+
+    this.connectPromise = new Promise((resolve, reject) => {
+      const path = `${LIVE_PATH}?key=${encodeURIComponent(this.apiKey)}`;
+      const wsKey = crypto.randomBytes(16).toString('base64');
+      this.socket = tls.connect({ host: LIVE_HOST, port: 443, servername: LIVE_HOST });
+      const failSetup = (err) => {
+        this.close();
+        reject(err);
+      };
+
+      const setupTimer = setTimeout(() => {
+        failSetup(Object.assign(new Error('Gemini Live API setup timed out'), { statusCode: 504 }));
+      }, Math.min(this.timeoutMs || 120000, 30000));
+
+      this.socket.on('error', (err) => this.handleSocketFailure(err));
+      this.socket.on('close', () => this.handleSocketFailure(Object.assign(new Error('Gemini Live API connection closed'), { statusCode: 502 })));
+      this.socket.on('data', (data) => {
+        try {
+          this.handleData(data, () => {
+            clearTimeout(setupTimer);
+            resolve();
+          }, failSetup);
+        } catch (err) {
+          this.handleSocketFailure(err);
+        }
+      });
+
+      this.socket.on('connect', () => {
+        this.socket.write([
+          `GET ${path} HTTP/1.1`,
+          `Host: ${LIVE_HOST}`,
+          'Upgrade: websocket',
+          'Connection: Upgrade',
+          `Sec-WebSocket-Key: ${wsKey}`,
+          'Sec-WebSocket-Version: 13',
+          'Origin: https://generativelanguage.googleapis.com',
+          '',
+          ''
+        ].join('\r\n'));
+      });
+    });
+
+    return this.connectPromise;
+  }
+
+  handleData(data, resolveSetup, failSetup) {
+    this.buffer = Buffer.concat([this.buffer, data]);
+
+    if (!this.handshaken) {
+      const idx = this.buffer.indexOf('\r\n\r\n');
+      if (idx < 0) return;
+      const header = this.buffer.slice(0, idx).toString('utf8');
+      this.buffer = this.buffer.slice(idx + 4);
+      if (!/^HTTP\/1\.1 101\b/.test(header)) {
+        const body = this.buffer.slice(0, 300).toString('utf8');
+        failSetup(Object.assign(
+          new Error(`Gemini Live WebSocket handshake failed: ${header.split('\r\n')[0]}${body ? ` ${body}` : ''}`),
+          { statusCode: 502 }
+        ));
+        return;
+      }
+      this.handshaken = true;
+      sendJson(this.socket, {
+        setup: {
+          model: `models/${this.model}`,
+          generationConfig: {
+            responseModalities: ['AUDIO'],
+            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: this.voiceName } } }
+          },
+          realtimeInputConfig: { automaticActivityDetection: { disabled: true } },
+          systemInstruction: { parts: [{ text: `${GEMINI_NARRATION_PROMPT} ${describeGeminiSpeed(this.speed)}`.trim() }] }
+        }
+      });
+    }
+
+    while (true) {
+      const frame = readFrame(this.buffer);
+      if (!frame) break;
+      this.buffer = frame.rest;
+
+      if (frame.opcode === 0x8) {
+        this.handleSocketFailure(Object.assign(new Error('Gemini Live API sent close frame'), { statusCode: 502 }));
+        break;
+      }
+      if (frame.opcode === 0x9) {
+        this.socket.write(makeFrame(frame.payload, 0xA));
+        continue;
+      }
+      if (frame.opcode !== 0x1 && frame.opcode !== 0x2) continue;
+
+      const msg = parseJsonPayload(frame.payload);
+      if (!msg) {
+        if (this.current && frame.opcode === 0x2 && frame.payload.length) this.current.chunks.push(frame.payload);
+        continue;
+      }
+
+      if (msg.setupComplete !== undefined) {
+        this.setupDone = true;
+        this._schedulePrewarm();
+        resolveSetup();
+        continue;
+      }
+
+      if (msg.serverContent) {
+        if (!this.current) continue;
+        const before = this.current.chunks.length;
+        collectAudioChunks(msg.serverContent, this.current.chunks);
+        if (this.current.onChunk) {
+          for (let i = before; i < this.current.chunks.length; i++) {
+            this.current.onChunk(this.current.chunks[i]);
+          }
+        }
+        if (msg.serverContent.turnComplete || msg.serverContent.generationComplete) {
+          if (!this.current.chunks.length) {
+            this.current.reject(Object.assign(new Error('Gemini Live API returned no audio'), { statusCode: 502 }));
+          } else {
+            this.current.resolve(Buffer.concat(this.current.chunks));
+          }
+        }
+        continue;
+      }
+
+      if (msg.goAway) {
+        console.warn(`[Gemini] GoAway received for reusable session: ${JSON.stringify(msg.goAway)}`);
+        this._triggerPrewarm();
+        this.closeAfterCurrent();
+        continue;
+      }
+
+      if (msg.error) {
+        const code = msg.error.code || 502;
+        this.handleSocketFailure(Object.assign(
+          new Error(`Gemini Live API error ${code}: ${msg.error.message || JSON.stringify(msg.error)}`),
+          { statusCode: code === 401 || code === 403 || code === 404 ? code : 502 }
+        ));
+      }
+    }
+  }
+
+  closeAfterCurrent() {
+    if (!this.current) this.close();
+    else this.closeWhenIdle = true;
+  }
+
+  handleSocketFailure(err) {
+    if (this.closed) return;
+    const current = this.current;
+    if (current) current.reject(err);
+    this.close();
+  }
+
+  clearIdleTimer() {
+    clearTimeout(this.idleTimer);
+    this.idleTimer = null;
+  }
+
+  armIdleTimer() {
+    if (this.closeWhenIdle) return this.close();
+    this.clearIdleTimer();
+    this.idleTimer = setTimeout(() => this.close(), WS_IDLE_TTL_MS);
+  }
+
+  _schedulePrewarm() {
+    if (this.prewarmTimer) return;
+    const remaining = SESSION_PREWARM_AT_MS - (Date.now() - this.createdAt);
+    if (remaining <= 0) {
+      this._triggerPrewarm();
+      return;
+    }
+    this.prewarmTimer = setTimeout(() => {
+      this.prewarmTimer = null;
+      if (!this.closed) this._triggerPrewarm();
+    }, remaining);
+  }
+
+  _triggerPrewarm() {
+    this.onNearExpiry?.();
+    this.onNearExpiry = null;
+  }
+
+  close() {
+    if (this.closed) return;
+    this.closed = true;
+    this.clearIdleTimer();
+    clearTimeout(this.prewarmTimer);
+    this.prewarmTimer = null;
+    try {
+      if (this.socket && !this.socket.destroyed) this.socket.write(makeFrame(Buffer.alloc(0), 0x8));
+    } catch {}
+    try { this.socket?.destroy(); } catch {}
+    this.socket?.removeAllListeners();
+    this.onClose?.();
+  }
+}
+
+function synthesizeChunkViaLive({ apiKey, model, voiceName, text, speed, timeoutMs, chunkIndex, chunkCount }) {
   return new Promise((resolve, reject) => {
     const path = `${LIVE_PATH}?key=${encodeURIComponent(apiKey)}`;
     const wsKey = crypto.randomBytes(16).toString('base64');
@@ -180,7 +511,7 @@ function synthesizeChunkViaLive({ apiKey, model, voiceName, text, timeoutMs, chu
             realtimeInputConfig: {
               automaticActivityDetection: { disabled: true }
             },
-            systemInstruction: { parts: [{ text: GEMINI_NARRATION_PROMPT }] }
+            systemInstruction: { parts: [{ text: `${GEMINI_NARRATION_PROMPT} ${describeGeminiSpeed(speed)}`.trim() }] }
           }
         });
         return;
@@ -313,6 +644,16 @@ function normalizeLiveModel(model) {
     .replace(/^models\//, '') || DEFAULT_MODEL;
 }
 
+function describeGeminiSpeed(speed) {
+  const value = Number.parseFloat(speed);
+  if (!Number.isFinite(value)) return '';
+  if (value <= 0.75) return '朗读语速明显放慢，保留更长停顿。';
+  if (value < 0.95) return '朗读语速稍慢，停顿更从容。';
+  if (value <= 1.05) return '朗读语速自然适中。';
+  if (value < 1.25) return '朗读语速稍快，但保持吐字清晰。';
+  return '朗读语速明显加快，但不要含混吞字。';
+}
+
 function splitTextForLive(text, maxChars) {
   const normalized = String(text || '').trim();
   if (!normalized) return [];
@@ -438,4 +779,23 @@ function tryConvertWavToMp3(wav) {
   });
 }
 
-module.exports = { GeminiClient, DEFAULT_MODEL, GEMINI_NARRATION_PROMPT, GEMINI_USER_TEXT_PREFIX };
+// 流式 WAV 头：用 0xFFFFFFFF 表示未知长度，主流播放器均支持
+function makeStreamingWavHeader(sampleRate = LIVE_SAMPLE_RATE, channels = LIVE_CHANNELS, bitDepth = LIVE_BIT_DEPTH) {
+  const header = Buffer.alloc(44);
+  header.write('RIFF', 0);
+  header.writeUInt32LE(0xFFFFFFFF, 4);
+  header.write('WAVE', 8);
+  header.write('fmt ', 12);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20);
+  header.writeUInt16LE(channels, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(sampleRate * channels * bitDepth / 8, 28);
+  header.writeUInt16LE(channels * bitDepth / 8, 32);
+  header.writeUInt16LE(bitDepth, 34);
+  header.write('data', 36);
+  header.writeUInt32LE(0xFFFFFFFF, 40);
+  return header;
+}
+
+module.exports = { GeminiClient, DEFAULT_MODEL, GEMINI_LIVE_MODELS, GEMINI_NARRATION_PROMPT, GEMINI_USER_TEXT_PREFIX, makeStreamingWavHeader };

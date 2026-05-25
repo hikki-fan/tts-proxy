@@ -73,6 +73,37 @@ const modeMeta = {
 
 const $ = (selector) => document.querySelector(selector);
 
+const _qrUrlCache = {};
+
+function renderInlineQr(url, containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  if (!url) { container.hidden = true; return; }
+  if (_qrUrlCache[containerId] === url) return; // URL 未变，保持现有内容和可见状态不变
+  _qrUrlCache[containerId] = url;
+  // 静默生成图片，不改变 hidden 状态（由按钮控制显隐）
+  container.innerHTML = '<span class="qr-inline-loading">生成中…</span>';
+  const stamp = url;
+  function tryLoad(src, fallbackSrc) {
+    const img = new Image();
+    img.className = 'qr-inline-img';
+    img.onload = () => {
+      if (_qrUrlCache[containerId] !== stamp) return;
+      container.innerHTML = '';
+      container.appendChild(img);
+    };
+    img.onerror = () => {
+      if (_qrUrlCache[containerId] !== stamp) return;
+      if (fallbackSrc) { tryLoad(fallbackSrc, null); return; }
+      container.innerHTML = '<span class="qr-inline-error">加载失败</span>';
+    };
+    img.src = src;
+  }
+  const primary = `https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=${encodeURIComponent(url)}&choe=UTF-8&chld=M|2`;
+  const fallback = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}&margin=8`;
+  tryLoad(primary, fallback);
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   applyTheme(localStorage.getItem('mimo_theme') || '');
   if (localStorage.getItem('mimo_sidebar_expanded') === '1') toggleSidebar(true, true);
@@ -158,18 +189,30 @@ function switchTab(tabId) {
   });
   state.activeTab = tabId;
   try { localStorage.setItem('mimo_active_tab', tabId); } catch {}
+  if (tabId === 'cache') loadCacheDetail();
+}
+
+function switchSettingsTab(tab) {
+  document.querySelectorAll('.settings-panel').forEach(p => {
+    p.hidden = p.id !== `settingsPanel${tab.charAt(0).toUpperCase() + tab.slice(1)}`;
+  });
+  document.querySelectorAll('.settings-tab-card').forEach(c => {
+    c.classList.toggle('active', c.dataset.stab === tab);
+  });
 }
 
 function switchStudioTab(tab) {
-  ['test', 'gemini', 'voices'].forEach((t) => {
-    const panel = document.getElementById(`studio${t.charAt(0).toUpperCase() + t.slice(1)}`);
-    if (panel) panel.hidden = t !== tab;
+  const validTabs = ['test', 'gemini'];
+  const t = validTabs.includes(tab) ? tab : 'test';
+  ['test', 'gemini'].forEach((name) => {
+    const panel = document.getElementById(`studio${name.charAt(0).toUpperCase() + name.slice(1)}`);
+    if (panel) panel.hidden = name !== t;
   });
   document.querySelectorAll('.studio-tab').forEach((b) => {
-    b.classList.toggle('active', b.dataset.studio === tab);
+    b.classList.toggle('active', b.dataset.studio === t);
   });
-  state.studioTab = tab;
-  try { localStorage.setItem('mimo_studio_tab', tab); } catch {}
+  state.studioTab = t;
+  try { localStorage.setItem('mimo_studio_tab', t); } catch {}
 }
 
 async function initPage() {
@@ -299,23 +342,37 @@ function bindEvents() {
   });
 
   $('#clearCacheBtn').addEventListener('click', clearCache);
+  $('#cacheDetailRefreshBtn').addEventListener('click', loadCacheDetail);
+  $('#cacheDetailDeleteBtn').addEventListener('click', deleteCacheSelected);
+  document.getElementById('cacheDetailSelectAll')?.addEventListener('change', (e) => {
+    document.querySelectorAll('#cacheDetailRows .cache-row-check').forEach(cb => {
+      cb.checked = e.target.checked;
+      cb.closest('tr').classList.toggle('selected', cb.checked);
+    });
+    updateCacheDetailSelCount();
+  });
+  $('#saveSubscriptionVoicesBtn').addEventListener('click', saveSubscriptionVoices);
+  document.getElementById('subscriptionVoiceList')?.addEventListener('change', updateSubscriptionVoiceCount);
   $('#settingsForm').addEventListener('submit', saveSettings);
-  $('#addVoiceBtn').addEventListener('click', () => addVoiceRow());
-  $('#saveVoicesBtn').addEventListener('click', saveVoices);
+  $('#addMimoVoiceBtn').addEventListener('click', () => addMimoVoiceRow());
+  $('#saveMimoVoicesBtn').addEventListener('click', saveVoices);
   $('#saveDesignVoiceBtn').addEventListener('click', saveDesignVoice);
   $('#reloadSourceBtn').addEventListener('click', loadSourcePreview);
   $('#legacyToggle').addEventListener('change', loadSourcePreview);
   $('#copySourceJsonBtn').addEventListener('click', () => copyText(state.sourceJson));
   $('#downloadSourceBtn').addEventListener('click', downloadSourceJson);
 
-  // QR 按钮（事件委托）
+  // QR 按钮（事件委托）— 切换内嵌二维码显示/隐藏
   document.body.addEventListener('click', (e) => {
-    const qrBtn = e.target.closest('.qr-btn');
+    const qrBtn = e.target.closest('.qr-btn[data-qr-toggle]');
     if (qrBtn) {
-      const inputId = qrBtn.dataset.qr;
-      const label = qrBtn.dataset.qrLabel || '订阅源';
-      const url = document.getElementById(inputId)?.value?.trim();
-      if (url) showQrModal(url, label);
+      const containerId = qrBtn.dataset.qrToggle;
+      const container = document.getElementById(containerId);
+      if (!container) return;
+      const willShow = container.hidden;
+      container.hidden = !willShow;
+      qrBtn.classList.toggle('qr-btn-active', willShow);
+      qrBtn.title = willShow ? '隐藏二维码' : '显示二维码';
       return;
     }
   });
@@ -381,8 +438,16 @@ function bindEvents() {
       state.statsMode = btn.dataset.mode;
       document.querySelectorAll('.chart-mode-btn').forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
-      if (state.statsData) renderChart(state.statsData);
+      if (state.statsData) {
+        renderChart(state.statsData);
+        renderStatsTotal(state.statsData.total);
+      }
     });
+  });
+
+  // Settings tab cards
+  document.querySelectorAll('.settings-tab-card').forEach(btn => {
+    btn.addEventListener('click', () => switchSettingsTab(btn.dataset.stab));
   });
 
   // Studio sub-tabs
@@ -403,11 +468,12 @@ function bindEvents() {
   });
 
   // Voice filter
-  $('#voiceFilter').addEventListener('input', filterVoiceRows);
+  $('#mimoVoiceFilter').addEventListener('input', filterMimoVoiceRows);
   $('#showAdvancedCols').addEventListener('change', toggleAdvancedCols);
-  document.getElementById('voiceFilterLang')?.addEventListener('change', filterVoiceRows);
-  document.getElementById('voiceFilterGender')?.addEventListener('change', filterVoiceRows);
-  document.getElementById('voiceFilterModel')?.addEventListener('change', filterVoiceRows);
+  document.getElementById('mimoVoiceFilterLang')?.addEventListener('change', filterMimoVoiceRows);
+  document.getElementById('mimoVoiceFilterGender')?.addEventListener('change', filterMimoVoiceRows);
+  document.getElementById('mimoVoiceFilterModel')?.addEventListener('change', filterMimoVoiceRows);
+  document.getElementById('geminiVoiceMgmtFilter')?.addEventListener('input', filterGeminiVoiceRows);
 
   document.body.addEventListener('click', (event) => {
     const hintLink = event.target.closest('.hint-link');
@@ -444,8 +510,9 @@ function bindEvents() {
 
     const row = action.closest('tr');
     if (action.dataset.action === 'delete') {
+      const inGemini = Boolean(row.closest('#geminiVoiceRows'));
       row.remove();
-      filterVoiceRows();
+      if (inGemini) filterGeminiVoiceRows(); else filterMimoVoiceRows();
     }
     if (action.dataset.action === 'up') moveRow(row, -1);
     if (action.dataset.action === 'down') moveRow(row, 1);
@@ -483,8 +550,10 @@ async function loadConfig(notify = false) {
     renderVoiceOptions();
     renderGeminiVoiceCards();
     renderVoices(data.voices);
+    renderSubscriptionVoices(data.voices);
     await loadSourcePreview();
     await loadStats();
+    if (state.activeTab === 'cache') await loadCacheDetail();
 
     // 无 adminToken 时显示未保护警告
     const authWarning = document.getElementById('authWarning');
@@ -524,6 +593,9 @@ function renderStatsTotal(total) {
   const el = $('#statsTotals');
   if (!el) return;
   const byModel = total?.byModel || {};
+  const byModelChars = total?.byModelChars || {};
+  const isChars = state.statsMode === 'chars';
+  const modelCounts = isChars ? byModelChars : byModel;
   el.innerHTML = `
     <div class="stat-total">
       <span>调用次数</span>
@@ -536,7 +608,7 @@ function renderStatsTotal(total) {
     <div class="stat-model-legend">
       ${Object.entries(MODEL_LABELS).map(([k, label]) => `
         <span class="model-legend-item">
-          <i style="background:${MODEL_BAR_COLORS[k]}"></i>${label}&nbsp;<b>${(byModel[k] || 0)}</b>
+          <i style="background:${MODEL_BAR_COLORS[k]}"></i>${label}&nbsp;<b>${fmtNum(modelCounts[k] || 0)}</b>
         </span>`).join('')}
     </div>
   `;
@@ -687,7 +759,7 @@ function renderChart(data) {
       const cx = toX(i);
       const totalH = baseY - toY(total); // curve height at this bucket
       let stackY = baseY;
-      ['standard', 'design', 'clone', 'doubao'].forEach(m => {
+      ['standard', 'design', 'clone', 'gemini'].forEach(m => {
         const cnt = bm[m] || 0;
         if (!cnt) return;
         const segH = Math.max(1, (cnt / total) * totalH);
@@ -754,7 +826,7 @@ function renderChart(data) {
     const b = buckets[closest];
     const total = mode === 'calls' ? b.calls : b.chars;
     const bm = mode === 'calls' ? (b.byModel||{}) : (b.byModelChars||{});
-    const rows = ['standard','design','clone','doubao']
+    const rows = ['standard','design','clone','gemini']
       .filter(m => (bm[m]||0) > 0)
       .map(m => `<div class="ct-row"><i style="background:${MODEL_BAR_COLORS[m]}"></i><span>${MODEL_LABELS[m]}</span><strong>${fmtNum(bm[m]||0)}</strong></div>`)
       .join('');
@@ -830,20 +902,19 @@ async function loadEmotionDefaults() {
 
 // ─── Voice Table ──────────────────────────────────────────────────────────────
 
-function filterVoiceRows() {
-  const text = ($('#voiceFilter')?.value || '').toLowerCase().trim();
-  const lang = $('#voiceFilterLang')?.value || '';
-  const gender = $('#voiceFilterGender')?.value || '';
-  const modelFilter = $('#voiceFilterModel')?.value || '';
+function filterMimoVoiceRows() {
+  const text = ($('#mimoVoiceFilter')?.value || '').toLowerCase().trim();
+  const lang = $('#mimoVoiceFilterLang')?.value || '';
+  const gender = $('#mimoVoiceFilterGender')?.value || '';
+  const modelFilter = $('#mimoVoiceFilterModel')?.value || '';
 
-  document.querySelectorAll('#voiceRows tr').forEach((row) => {
+  document.querySelectorAll('#mimoVoiceRows tr').forEach((row) => {
     const id = (row.querySelector('[data-field="id"]')?.value || '').toLowerCase();
     const name = (row.querySelector('[data-field="name"]')?.value || '').toLowerCase();
     const voice = (row.querySelector('[data-field="voice"]')?.value || '').toLowerCase();
     const rowLang = row.querySelector('[data-field="language"]')?.value || '';
     const rowGender = row.querySelector('[data-field="gender"]')?.value || '';
     const rowModel = row.querySelector('[data-field="model"]')?.value || '';
-    const rowProvider = row.querySelector('[data-field="provider"]')?.value || 'mimo';
 
     const modeMatch = () => {
       if (!modelFilter) return true;
@@ -859,6 +930,16 @@ function filterVoiceRows() {
       (!gender || rowGender === gender) &&
       modeMatch()
     );
+  });
+}
+
+function filterGeminiVoiceRows() {
+  const text = ($('#geminiVoiceMgmtFilter')?.value || '').toLowerCase().trim();
+  document.querySelectorAll('#geminiVoiceRows tr').forEach((row) => {
+    const id = (row.querySelector('[data-field="id"]')?.value || '').toLowerCase();
+    const name = (row.querySelector('[data-field="name"]')?.value || '').toLowerCase();
+    const voice = (row.querySelector('[data-field="voice"]')?.value || '').toLowerCase();
+    row.hidden = Boolean(text && !id.includes(text) && !name.includes(text) && !voice.includes(text));
   });
 }
 
@@ -883,10 +964,8 @@ function toggleAdvancedCols() {
 
 function renderConfig(data) {
   $('#baseUrl').textContent = data.service.baseUrl;
-  $('#voiceCount').textContent = data.voices.length;
   $('#cacheCount').textContent = data.cache.count || 0;
   $('#cacheBytes').textContent = formatBytes(data.cache.bytes || 0);
-  $('#modelName').textContent = data.service.mimoModel;
   $('#sourceUrlLocal').value = data.endpoints.voiceSourcesLocal
     || `http://127.0.0.1:${data.service.port}/api/reader/tts-configs.json`;
 
@@ -899,6 +978,7 @@ function renderConfig(data) {
       : '');
   $('#sourceUrlPublic').value = rawPub;
   $('#sourceUrlPublicHint').hidden = Boolean(rawPub);
+  renderInlineQr(rawPub, 'qrSourceUrlPublic');
 
   $('#legacySourceUrl').value = (data.endpoints.legacyVoiceSources || '')
     .replace(/(\/api\/reader\/tts-configs)(\.json)?(\?|$)/, '$1.json$3');
@@ -909,6 +989,8 @@ function renderConfig(data) {
   setStatus($('#cacheStatus'), data.cache.enabled ? `缓存 ${data.cache.count}` : '缓存关闭', data.cache.enabled);
   const geminiStatus = $('#geminiStatus');
   if (geminiStatus) setStatus(geminiStatus, data.service.geminiConfigured ? 'Gemini 已配置' : 'Gemini 未配置', data.service.geminiConfigured);
+  const geminiTestStatus = $('#geminiTestStatus');
+  if (geminiTestStatus) setStatus(geminiTestStatus, data.service.geminiConfigured ? 'Gemini 已配置' : 'Gemini 未配置', data.service.geminiConfigured);
   updateSelectedVoiceField();
 }
 
@@ -968,7 +1050,17 @@ function renderSettings(data) {
   const settings = data.settings || {};
   $('#settingsMimoBaseUrl').value = settings.mimoBaseUrl || '';
   $('#settingsMimoModel').value = settings.mimoModel || data.service.mimoModel;
-  $('#settingsGeminiModel').value = settings.geminiModel || data.service.geminiModel || '';
+  const geminiModelSelect = $('#settingsGeminiModel');
+  if (data.service.geminiModels && data.service.geminiModels.length) {
+    geminiModelSelect.innerHTML = data.service.geminiModels
+      .map((m) => `<option value="${m.id}">${m.name}</option>`)
+      .join('');
+  }
+  const currentGeminiModel = settings.geminiModel || data.service.geminiModel || '';
+  if (currentGeminiModel && !Array.from(geminiModelSelect.options).some((o) => o.value === currentGeminiModel)) {
+    geminiModelSelect.insertAdjacentHTML('beforeend', `<option value="${currentGeminiModel}">${currentGeminiModel}</option>`);
+  }
+  geminiModelSelect.value = currentGeminiModel;
   $('#settingsGeminiApiKey').value = '';
   $('#settingsGeminiApiKey').placeholder = settings.geminiApiKeyConfigured
     ? `已配置 ${settings.geminiApiKeyMasked}`
@@ -1294,18 +1386,24 @@ function pickDefaultVoice(voices, language) {
 }
 
 function renderVoices(voices) {
-  const tbody = $('#voiceRows');
-  tbody.innerHTML = '';
+  const mimoTbody = $('#mimoVoiceRows');
+  const geminiTbody = $('#geminiVoiceRows');
+  mimoTbody.innerHTML = '';
+  geminiTbody.innerHTML = '';
   voices
     .slice()
     .sort((a, b) => Number(a.order) - Number(b.order))
-    .forEach((voice) => addVoiceRow(voice));
-  filterVoiceRows();
+    .forEach((voice) => {
+      if (voice.provider === 'gemini') addGeminiVoiceRow(voice);
+      else addMimoVoiceRow(voice);
+    });
+  filterMimoVoiceRows();
+  filterGeminiVoiceRows();
 }
 
-function addVoiceRow(voice = {}) {
+function addMimoVoiceRow(voice = {}) {
   const showAdv = $('#showAdvancedCols').checked;
-  const tbody = $('#voiceRows');
+  const tbody = $('#mimoVoiceRows');
   const index = tbody.children.length + 1;
   const row = document.createElement('tr');
   const name = voice.name || '自定义';
@@ -1319,17 +1417,9 @@ function addVoiceRow(voice = {}) {
     </td>
     <td><input data-field="id" value="${escapeAttr(voice.id || `mimo-custom-${index}`)}"></td>
     <td><input data-field="name" value="${escapeAttr(name)}"></td>
-    <td>
-      <select data-field="provider">
-        <option value="mimo" ${(voice.provider || 'mimo') !== 'gemini' ? 'selected' : ''}>MiMo</option>
-        <option value="gemini" ${voice.provider === 'gemini' ? 'selected' : ''}>Gemini</option>
-      </select>
-    </td>
     <td class="td-voice">${isClone
       ? `<span class="clone-voice-cell">${voice.cloneAudioReady ? '✓ 已上传音频' : '⚠ 未上传音频'}</span><input data-field="voice" type="hidden" value="${escapeAttr(voice.voice || 'clone')}">`
-      : voice.provider === 'gemini'
-        ? `<input data-field="voice" list="geminiVoiceDatalist" value="${escapeAttr(voice.voice || 'Aoede')}" placeholder="如 Aoede, Charon...">`
-        : `<select data-field="voice">${buildVoiceOptions(voice.voice || 'mimo_default')}</select>`
+      : `<select data-field="voice">${buildVoiceOptions(voice.voice || 'mimo_default')}</select>`
     }</td>
     <td class="col-advanced"${showAdv ? '' : ' hidden'}>
       <select data-field="model">
@@ -1363,17 +1453,45 @@ function addVoiceRow(voice = {}) {
     </td>
   `;
   tbody.append(row);
+}
 
-  row.querySelector('[data-field="provider"]').addEventListener('change', function () {
-    const isGemini = this.value === 'gemini';
-    const voiceTd = row.querySelector('.td-voice');
-    const curVoice = voiceTd.querySelector('[data-field="voice"]')?.value || '';
-    if (isGemini) {
-      voiceTd.innerHTML = `<input data-field="voice" list="geminiVoiceDatalist" value="${escapeAttr(curVoice || 'Aoede')}" placeholder="如 Aoede, Charon...">`;
-    } else {
-      voiceTd.innerHTML = `<select data-field="voice">${buildVoiceOptions(curVoice && curVoice !== 'Aoede' ? curVoice : 'mimo_default')}</select>`;
-    }
-  });
+function addGeminiVoiceRow(voice = {}) {
+  const tbody = $('#geminiVoiceRows');
+  const index = tbody.children.length + 1;
+  const row = document.createElement('tr');
+  const name = voice.name || 'Gemini 音色';
+  const avatarColor = voiceAvatarColor(name);
+  const initial = escapeHtml([...name][0] || '?');
+
+  row.innerHTML = `
+    <td class="td-avatar">
+      <div class="voice-avatar voice-avatar-sm" style="background:${avatarColor}">${initial}</div>
+    </td>
+    <td><input data-field="id" value="${escapeAttr(voice.id || `gemini-custom-${index}`)}"></td>
+    <td><input data-field="name" value="${escapeAttr(name)}"></td>
+    <td class="td-voice"><input data-field="voice" list="geminiVoiceDatalist" value="${escapeAttr(voice.voice || 'Aoede')}" placeholder="如 Aoede, Charon..."></td>
+    <td>
+      <select data-field="language">
+        <option value="zh" ${voice.language !== 'en' ? 'selected' : ''}>中文</option>
+        <option value="en" ${voice.language === 'en' ? 'selected' : ''}>English</option>
+      </select>
+    </td>
+    <td>
+      <select data-field="gender">
+        <option value="female" ${voice.gender !== 'male' ? 'selected' : ''}>女声</option>
+        <option value="male" ${voice.gender === 'male' ? 'selected' : ''}>男声</option>
+      </select>
+    </td>
+    <td><input data-field="order" type="number" value="${escapeAttr(voice.order || index * 10)}" style="width:60px"></td>
+    <td>
+      <div class="row-actions">
+        <button type="button" data-action="up" title="上移" class="icon-btn">↑</button>
+        <button type="button" data-action="down" title="下移" class="icon-btn">↓</button>
+        <button type="button" class="icon-btn danger" data-action="delete" title="删除">🗑</button>
+      </div>
+    </td>
+  `;
+  tbody.append(row);
 }
 
 async function saveVoices() {
@@ -1464,30 +1582,81 @@ async function saveDesignVoice() {
   toast('新音色已保存到订阅源');
 }
 
-function collectVoices() {
-  return Array.from($('#voiceRows').querySelectorAll('tr')).map((row, index) => {
-    const value = (field) => {
-      const el = row.querySelector(`[data-field="${field}"]`);
-      return el ? el.value.trim() : '';
-    };
-    const existing = state.voices.find((voice) => voice.id === value('id')) || {};
-    const voiceId = value('voice');
-    const model = value('model');
-    return {
-      id: value('id'),
-      name: value('name'),
-      voice: voiceId,
-      provider: value('provider') || 'mimo',
-      language: value('language') || 'zh',
-      gender: value('gender') || 'female',
-      model,
-      voiceDescription: value('voiceDescription'),
-      badge: value('badge'),
-      description: existing.description || '',
-      color: existing.color || '',
-      order: Number(value('order')) || index + 1
-    };
+// ─── Subscription Voice Selection ────────────────────────────────────────────
+
+function renderSubscriptionVoices(voices) {
+  const container = $('#subscriptionVoiceList');
+  if (!container) return;
+
+  const mimoVoices = voices.filter(v => v.provider !== 'gemini');
+  const geminiVoices = voices.filter(v => v.provider === 'gemini');
+
+  function renderGroup(title, groupVoices) {
+    if (!groupVoices.length) return '';
+    return `
+      <div class="sub-voice-group">
+        <div class="sub-voice-group-title">${title}</div>
+        <div class="sub-voice-items">
+          ${groupVoices.map(v => `
+            <label class="sub-voice-item">
+              <input type="checkbox" data-voice-id="${escapeAttr(v.id)}" ${v.inSubscription !== false ? 'checked' : ''}>
+              <span class="sub-voice-name">${escapeHtml(v.name)}</span>
+              <span class="sub-voice-lang">${v.language === 'zh' ? '中文' : 'En'} · ${v.gender === 'male' ? '男' : '女'}</span>
+            </label>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  container.innerHTML = renderGroup('MiMo', mimoVoices) + renderGroup('Gemini', geminiVoices);
+  updateSubscriptionVoiceCount();
+}
+
+function updateSubscriptionVoiceCount() {
+  const checkboxes = document.querySelectorAll('#subscriptionVoiceList input[type="checkbox"]');
+  const checked = Array.from(checkboxes).filter(c => c.checked).length;
+  const el = $('#subscriptionVoiceCount');
+  if (el) el.textContent = `${checked} / ${checkboxes.length} 个音色将出现在订阅中`;
+}
+
+async function saveSubscriptionVoices() {
+  const checkboxes = document.querySelectorAll('#subscriptionVoiceList input[type="checkbox"]');
+  const selectedIds = new Set(Array.from(checkboxes).filter(c => c.checked).map(c => c.dataset.voiceId));
+  const voices = state.voices.map(v => ({ ...v, inSubscription: selectedIds.has(v.id) }));
+  await adminJson('/api/admin/voices', {
+    method: 'PUT',
+    body: JSON.stringify({ voices })
   });
+  toast('订阅音色已保存');
+  await loadConfig(false);
+}
+
+function collectVoices() {
+  const fromTable = (tbodyId, provider) =>
+    Array.from(document.querySelectorAll(`#${tbodyId} tr`)).map((row, index) => {
+      const value = (field) => {
+        const el = row.querySelector(`[data-field="${field}"]`);
+        return el ? el.value.trim() : '';
+      };
+      const existing = state.voices.find((voice) => voice.id === value('id')) || {};
+      return {
+        id: value('id'),
+        name: value('name'),
+        voice: value('voice'),
+        provider,
+        language: value('language') || 'zh',
+        gender: value('gender') || 'female',
+        model: value('model'),
+        voiceDescription: value('voiceDescription'),
+        badge: value('badge'),
+        description: existing.description || '',
+        color: existing.color || '',
+        order: Number(value('order')) || index + 1
+      };
+    });
+
+  return [...fromTable('mimoVoiceRows', 'mimo'), ...fromTable('geminiVoiceRows', 'gemini')];
 }
 
 function moveRow(row, direction) {
@@ -1498,7 +1667,7 @@ function moveRow(row, direction) {
     row.parentNode.insertBefore(row.nextElementSibling, row);
   }
 
-  Array.from($('#voiceRows').querySelectorAll('tr')).forEach((item, index) => {
+  Array.from(row.parentNode.querySelectorAll('tr')).forEach((item, index) => {
     item.querySelector('[data-field="order"]').value = (index + 1) * 10;
   });
 }
@@ -1520,7 +1689,89 @@ async function clearCache() {
   const result = await adminJson('/api/admin/cache/clear', { method: 'POST' });
   toast(`已清理 ${result.deleted} 个缓存文件`);
   await loadConfig(false);
+  await loadCacheDetail();
 }
+
+async function loadCacheDetail() {
+  const tbody = document.getElementById('cacheDetailRows');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="8" class="cache-detail-empty">加载中…</td></tr>';
+  try {
+    const data = await adminJson('/api/admin/cache/list');
+    renderCacheDetail(data.entries || []);
+  } catch {
+    tbody.innerHTML = '<tr><td colspan="8" class="cache-detail-empty">加载失败</td></tr>';
+  }
+}
+
+function renderCacheDetail(entries) {
+  const tbody = document.getElementById('cacheDetailRows');
+  const selAll = document.getElementById('cacheDetailSelectAll');
+  if (!tbody) return;
+
+  if (!entries.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="cache-detail-empty">暂无缓存</td></tr>';
+    updateCacheDetailSelCount();
+    return;
+  }
+
+  tbody.innerHTML = entries.map(e => {
+    const time = e.cachedAt ? new Date(e.cachedAt).toLocaleString('zh-CN', { hour12: false }) : (e.mtimeMs ? new Date(e.mtimeMs).toLocaleString('zh-CN', { hour12: false }) : '—');
+    const size = formatBytes(e.size || 0);
+    const model = escapeHtml(e.model || e.provider || '—');
+    const voice = escapeHtml(e.voice || '—');
+    const fmt = escapeHtml(e.format || '—');
+    const chars = e.chars != null ? e.chars : '—';
+    const preview = escapeHtml(e.textPreview || '—');
+    return `<tr data-key="${escapeAttr(e.key)}">
+      <td class="th-check"><label class="check"><input type="checkbox" class="cache-row-check"></label></td>
+      <td>${model}</td>
+      <td>${voice}</td>
+      <td>${fmt}</td>
+      <td>${chars}</td>
+      <td>${size}</td>
+      <td>${time}</td>
+      <td class="td-preview" title="${escapeAttr(e.textPreview || '')}">${preview}</td>
+    </tr>`;
+  }).join('');
+
+  tbody.querySelectorAll('.cache-row-check').forEach(cb => {
+    cb.addEventListener('change', () => {
+      cb.closest('tr').classList.toggle('selected', cb.checked);
+      updateCacheDetailSelCount();
+    });
+  });
+
+  if (selAll) selAll.checked = false;
+  updateCacheDetailSelCount();
+}
+
+function updateCacheDetailSelCount() {
+  const checked = document.querySelectorAll('#cacheDetailRows .cache-row-check:checked').length;
+  const total = document.querySelectorAll('#cacheDetailRows .cache-row-check').length;
+  const countEl = document.getElementById('cacheDetailSelCount');
+  const delBtn = document.getElementById('cacheDetailDeleteBtn');
+  if (countEl) countEl.textContent = total ? `已选 ${checked} / ${total}` : '';
+  if (delBtn) delBtn.disabled = checked === 0;
+}
+
+async function deleteCacheSelected() {
+  const rows = [...document.querySelectorAll('#cacheDetailRows tr.selected')];
+  const keys = rows.map(r => r.dataset.key).filter(Boolean);
+  if (!keys.length) return;
+  const delBtn = document.getElementById('cacheDetailDeleteBtn');
+  if (delBtn) delBtn.disabled = true;
+  try {
+    await adminJson('/api/admin/cache/delete', { method: 'POST', body: JSON.stringify({ keys }) });
+    toast(`已删除 ${keys.length} 个缓存文件`);
+    await loadConfig(false);
+    await loadCacheDetail();
+  } catch {
+    toast('删除失败');
+    updateCacheDetailSelCount();
+  }
+}
+
 
 function renderGeminiVoiceCards() {
   const container = $('#geminiVoiceCards');
