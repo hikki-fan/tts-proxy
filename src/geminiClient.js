@@ -1,5 +1,6 @@
 const crypto = require('node:crypto');
 const tls = require('node:tls');
+const net = require('node:net');
 const { spawn } = require('node:child_process');
 
 const DEFAULT_MODEL = 'gemini-2.5-flash-native-audio-preview-12-2025';
@@ -216,30 +217,49 @@ class GeminiLiveSession {
     this.connectPromise = new Promise((resolve, reject) => {
       const path = `${LIVE_PATH}?key=${encodeURIComponent(this.apiKey)}`;
       const wsKey = crypto.randomBytes(16).toString('base64');
-      this.socket = tls.connect({ host: LIVE_HOST, port: 443, servername: LIVE_HOST });
+      let setupResolved = false;
       const failSetup = (err) => {
+        if (setupResolved) return;
+        setupResolved = true;
+        clearTimeout(setupTimer);
         this.close();
         reject(err);
       };
+      const resolveSetupOnce = () => {
+        if (setupResolved) return;
+        setupResolved = true;
+        clearTimeout(setupTimer);
+        resolve();
+      };
 
       const setupTimer = setTimeout(() => {
-        failSetup(Object.assign(new Error('Gemini Live API setup timed out'), { statusCode: 504 }));
+        failSetup(Object.assign(new Error('Gemini Live API setup timed out（可能是网络不通或模型名错误）'), { statusCode: 504 }));
       }, Math.min(this.timeoutMs || 120000, 30000));
 
-      this.socket.on('error', (err) => this.handleSocketFailure(err));
-      this.socket.on('close', () => this.handleSocketFailure(Object.assign(new Error('Gemini Live API connection closed'), { statusCode: 502 })));
-      this.socket.on('data', (data) => {
-        try {
-          this.handleData(data, () => {
-            clearTimeout(setupTimer);
-            resolve();
-          }, failSetup);
-        } catch (err) {
-          this.handleSocketFailure(err);
-        }
-      });
-
-      this.socket.on('connect', () => {
+      const onSocketReady = (socket) => {
+        this.socket = socket;
+        this.socket.on('error', (err) => {
+          console.error(`[Gemini] socket error: ${err.message}`);
+          if (!setupResolved) {
+            failSetup(Object.assign(new Error(`Gemini Live API 连接失败: ${err.message}`), { statusCode: 502 }));
+          } else {
+            this.handleSocketFailure(err);
+          }
+        });
+        this.socket.on('close', () => {
+          if (!setupResolved) {
+            failSetup(Object.assign(new Error('Gemini Live API 连接在 setup 完成前断开'), { statusCode: 502 }));
+          } else {
+            this.handleSocketFailure(Object.assign(new Error('Gemini Live API connection closed'), { statusCode: 502 }));
+          }
+        });
+        this.socket.on('data', (data) => {
+          try {
+            this.handleData(data, resolveSetupOnce, failSetup);
+          } catch (err) {
+            this.handleSocketFailure(err);
+          }
+        });
         this.socket.write([
           `GET ${path} HTTP/1.1`,
           `Host: ${LIVE_HOST}`,
@@ -251,6 +271,10 @@ class GeminiLiveSession {
           '',
           ''
         ].join('\r\n'));
+      };
+
+      connectSocket(LIVE_HOST, 443).then(onSocketReady).catch((err) => {
+        failSetup(Object.assign(new Error(`Gemini Live API 连接失败: ${err.message}`), { statusCode: 502 }));
       });
     });
 
@@ -407,19 +431,18 @@ class GeminiLiveSession {
   }
 }
 
-function synthesizeChunkViaLive({ apiKey, model, voiceName, text, speed, timeoutMs, chunkIndex, chunkCount }) {
-  return new Promise((resolve, reject) => {
-    const path = `${LIVE_PATH}?key=${encodeURIComponent(apiKey)}`;
-    const wsKey = crypto.randomBytes(16).toString('base64');
-    const socket = tls.connect({ host: LIVE_HOST, port: 443, servername: LIVE_HOST });
+async function synthesizeChunkViaLive({ apiKey, model, voiceName, text, speed, timeoutMs, chunkIndex, chunkCount }) {
+  const socket = await connectSocket(LIVE_HOST, 443);
+  const path = `${LIVE_PATH}?key=${encodeURIComponent(apiKey)}`;
+  const wsKey = crypto.randomBytes(16).toString('base64');
 
+  return new Promise((resolve, reject) => {
     let buffer = Buffer.alloc(0);
     let handshaken = false;
     let setupDone = false;
     let done = false;
     let closeRequested = false;
     let idleTimer = null;
-    let hardTimer = null;
     const pcmChunks = [];
 
     const cleanup = () => {
@@ -455,36 +478,18 @@ function synthesizeChunkViaLive({ apiKey, model, voiceName, text, speed, timeout
       idleTimer = setTimeout(finish, Math.min(timeoutMs, 30000));
     };
 
-    hardTimer = setTimeout(() => {
+    const hardTimer = setTimeout(() => {
       fail(Object.assign(new Error('Gemini Live API request timed out'), { statusCode: 504 }));
     }, timeoutMs);
 
     socket.on('error', fail);
-    socket.on('close', () => {
-      if (!done) finish();
-    });
-
-    socket.on('connect', () => {
-      socket.write([
-        `GET ${path} HTTP/1.1`,
-        `Host: ${LIVE_HOST}`,
-        'Upgrade: websocket',
-        'Connection: Upgrade',
-        `Sec-WebSocket-Key: ${wsKey}`,
-        'Sec-WebSocket-Version: 13',
-        'Origin: https://generativelanguage.googleapis.com',
-        '',
-        ''
-      ].join('\r\n'));
-    });
-
+    socket.on('close', () => { if (!done) finish(); });
     socket.on('data', (data) => {
       buffer = Buffer.concat([buffer, data]);
 
       if (!handshaken) {
         const idx = buffer.indexOf('\r\n\r\n');
         if (idx < 0) return;
-
         const header = buffer.slice(0, idx).toString('utf8');
         buffer = buffer.slice(idx + 4);
         if (!/^HTTP\/1\.1 101\b/.test(header)) {
@@ -495,22 +500,15 @@ function synthesizeChunkViaLive({ apiKey, model, voiceName, text, speed, timeout
           ));
           return;
         }
-
         handshaken = true;
         sendJson(socket, {
           setup: {
             model: `models/${model}`,
             generationConfig: {
               responseModalities: ['AUDIO'],
-              speechConfig: {
-                voiceConfig: {
-                  prebuiltVoiceConfig: { voiceName }
-                }
-              }
+              speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } }
             },
-            realtimeInputConfig: {
-              automaticActivityDetection: { disabled: true }
-            },
+            realtimeInputConfig: { automaticActivityDetection: { disabled: true } },
             systemInstruction: { parts: [{ text: `${GEMINI_NARRATION_PROMPT} ${describeGeminiSpeed(speed)}`.trim() }] }
           }
         });
@@ -521,45 +519,42 @@ function synthesizeChunkViaLive({ apiKey, model, voiceName, text, speed, timeout
         const frame = readFrame(buffer);
         if (!frame) break;
         buffer = frame.rest;
-
-        if (frame.opcode === 0x8) {
-          finish();
-          break;
-        }
-        if (frame.opcode === 0x9) {
-          socket.write(makeFrame(frame.payload, 0xA));
-          continue;
-        }
+        if (frame.opcode === 0x8) { finish(); break; }
+        if (frame.opcode === 0x9) { socket.write(makeFrame(frame.payload, 0xA)); continue; }
         if (frame.opcode !== 0x1 && frame.opcode !== 0x2) continue;
 
         const msg = parseJsonPayload(frame.payload);
         if (!msg) {
-          if (frame.opcode === 0x2 && frame.payload.length) {
-            pcmChunks.push(frame.payload);
-            resetIdleTimer();
-          }
+          if (frame.opcode === 0x2 && frame.payload.length) { pcmChunks.push(frame.payload); resetIdleTimer(); }
           continue;
         }
-
         const action = handleLiveMessage(msg, {
-          socket,
-          text,
-          pcmChunks,
+          socket, text, pcmChunks,
           setupDoneRef: (value) => { setupDone = value; },
-          resetIdleTimer,
-          finish,
-          fail,
+          resetIdleTimer, finish, fail,
           requestClose: () => {
             if (closeRequested) return;
             closeRequested = true;
             socket.write(makeFrame(Buffer.alloc(0), 0x8));
           },
-          chunkIndex,
-          chunkCount
+          chunkIndex, chunkCount
         });
         if (action === 'break') break;
       }
     });
+
+    // socket 已连接，直接发起 WebSocket 升级
+    socket.write([
+      `GET ${path} HTTP/1.1`,
+      `Host: ${LIVE_HOST}`,
+      'Upgrade: websocket',
+      'Connection: Upgrade',
+      `Sec-WebSocket-Key: ${wsKey}`,
+      'Sec-WebSocket-Version: 13',
+      'Origin: https://generativelanguage.googleapis.com',
+      '',
+      ''
+    ].join('\r\n'));
   });
 }
 
@@ -796,6 +791,69 @@ function makeStreamingWavHeader(sampleRate = LIVE_SAMPLE_RATE, channels = LIVE_C
   header.write('data', 36);
   header.writeUInt32LE(0xFFFFFFFF, 40);
   return header;
+}
+
+// 建立到目标主机的 TLS 连接，支持 HTTPS_PROXY / https_proxy 环境变量
+// 代理格式：http://[user:pass@]host:port
+function connectSocket(host, port) {
+  const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy ||
+                   process.env.HTTP_PROXY  || process.env.http_proxy;
+  if (!proxyUrl) {
+    return new Promise((resolve, reject) => {
+      const socket = tls.connect({ host, port, servername: host });
+      socket.once('secureConnect', () => resolve(socket));
+      socket.once('error', reject);
+    });
+  }
+
+  // 解析代理地址
+  let proxyHost, proxyPort, proxyAuth;
+  try {
+    const u = new URL(proxyUrl);
+    proxyHost = u.hostname;
+    proxyPort = Number(u.port) || 8080;
+    proxyAuth = (u.username || u.password)
+      ? Buffer.from(`${decodeURIComponent(u.username)}:${decodeURIComponent(u.password)}`).toString('base64')
+      : null;
+  } catch {
+    return Promise.reject(new Error(`HTTPS_PROXY 格式无效: ${proxyUrl}`));
+  }
+
+  console.log(`[Gemini] 通过代理 ${proxyHost}:${proxyPort} 连接 ${host}:${port}`);
+
+  return new Promise((resolve, reject) => {
+    const tcp = net.connect({ host: proxyHost, port: proxyPort });
+    tcp.once('error', reject);
+    tcp.once('connect', () => {
+      const connectReq = [
+        `CONNECT ${host}:${port} HTTP/1.1`,
+        `Host: ${host}:${port}`,
+        ...(proxyAuth ? [`Proxy-Authorization: Basic ${proxyAuth}`] : []),
+        '',
+        ''
+      ].join('\r\n');
+      tcp.write(connectReq);
+
+      let buf = '';
+      const onData = (chunk) => {
+        buf += chunk.toString('utf8');
+        const idx = buf.indexOf('\r\n\r\n');
+        if (idx < 0) return;
+        tcp.removeListener('data', onData);
+        const status = buf.slice(0, buf.indexOf('\r\n'));
+        if (!/^HTTP\/1\.[01] 200\b/.test(status)) {
+          tcp.destroy();
+          reject(new Error(`代理 CONNECT 失败: ${status}`));
+          return;
+        }
+        // 隧道建立，升级为 TLS
+        const tlsSocket = tls.connect({ socket: tcp, host, servername: host });
+        tlsSocket.once('secureConnect', () => resolve(tlsSocket));
+        tlsSocket.once('error', reject);
+      };
+      tcp.on('data', onData);
+    });
+  });
 }
 
 module.exports = { GeminiClient, DEFAULT_MODEL, GEMINI_LIVE_MODELS, GEMINI_NARRATION_PROMPT, GEMINI_USER_TEXT_PREFIX, makeStreamingWavHeader };
