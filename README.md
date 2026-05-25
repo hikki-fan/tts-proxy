@@ -205,8 +205,10 @@ rm -rf ./data/cache/*
 | `PUBLIC_BASE_URL` | 从请求推断 | 写入声音源 URL 的对外地址 |
 | `MIMO_BASE_URL` | `https://api.xiaomimimo.com/v1` | MiMo API 地址 |
 | `MIMO_MODEL` | `mimo-v2.5-tts` | 默认 TTS 模型 |
+| `GEMINI_API_KEY` | — | Gemini API Key（Gemini 音色必填） |
+| `GEMINI_MODEL` | `gemini-2.5-flash-native-audio-preview-12-2025` | Gemini Live API 模型；也可在管理后台切换到可用的 Gemini 3 Flash Live 模型 |
 | `DEFAULT_VOICE` | `mimo_default` | 默认音色 |
-| `DEFAULT_FORMAT` | `mp3` | 音频格式：`mp3` / `wav` / `pcm16` |
+| `DEFAULT_FORMAT` | `mp3` | 音频格式：`mp3` / `aac` / `wav` / `pcm16` |
 | `DEFAULT_SPEED` | `1` | 语速（0.6 ~ 1.4） |
 | `ACCESS_TOKEN` | — | 阅读端访问 Token（留空不鉴权） |
 | `ADMIN_TOKEN` | — | 管理后台密码（留空不鉴权） |
@@ -244,7 +246,7 @@ rm -rf ./data/cache/*
 - 对外访问地址（IP/域名/端口）
 - 阅读访问 Token 和管理 Token
 
-**工作台 → 合成测试**
+**工作台 → MiMo 测试**
 - 三种模型卡片：标准 TTS / 声音设计 / 声音克隆
 - 卡片式音色选择（支持语言/性别筛选）
 - 格式、语速调整和试听

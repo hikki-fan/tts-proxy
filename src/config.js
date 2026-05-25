@@ -46,6 +46,7 @@ function normalizeVoices(voices) {
     badge: String(voice.badge || ''),
     color: String(voice.color || ''),
     order: Number.isFinite(Number(voice.order)) ? Number(voice.order) : index + 1,
+    provider: String(voice.provider || 'mimo'),
     cloneAudioFile: String(voice.cloneAudioFile || '')
   }));
 }
@@ -136,6 +137,7 @@ function normalizeWritableSettings(input = {}) {
     'publicBaseUrl',
     'mimoBaseUrl',
     'mimoModel',
+    'geminiModel',
     'defaultVoice',
     'defaultFormat',
     'defaultSpeed',
@@ -158,7 +160,7 @@ function normalizeWritableSettings(input = {}) {
     if (hasOwn(input, field)) normalized[field] = String(input[field] ?? '');
   }
 
-  for (const field of ['mimoApiKey', 'accessToken', 'adminToken']) {
+  for (const field of ['mimoApiKey', 'geminiApiKey', 'accessToken', 'adminToken']) {
     const clearFlag = `clear${field.slice(0, 1).toUpperCase()}${field.slice(1)}`;
     if (input[clearFlag]) {
       normalized[field] = '';
@@ -207,6 +209,9 @@ function getSettingsView() {
     mimoModel: config.mimoModel,
     mimoApiKeyConfigured: Boolean(config.mimoApiKey),
     mimoApiKeyMasked: maskSecret(config.mimoApiKey),
+    geminiModel: config.geminiModel,
+    geminiApiKeyConfigured: Boolean(config.geminiApiKey),
+    geminiApiKeyMasked: maskSecret(config.geminiApiKey),
     accessTokenConfigured: Boolean(config.accessToken),
     accessTokenMasked: maskSecret(config.accessToken),
     adminTokenConfigured: Boolean(config.adminToken),
@@ -235,6 +240,8 @@ const config = {
   mimoBaseUrl: settingOrEnv(settings, 'mimoBaseUrl', process.env.MIMO_BASE_URL, 'https://api.xiaomimimo.com/v1').replace(/\/+$/, ''),
   mimoModel: settingOrEnv(settings, 'mimoModel', process.env.MIMO_MODEL, 'mimo-v2.5-tts'),
   models,
+  geminiApiKey: settingOrEnv(settings, 'geminiApiKey', process.env.GEMINI_API_KEY),
+  geminiModel: settingOrEnv(settings, 'geminiModel', process.env.GEMINI_MODEL, 'gemini-2.5-flash-native-audio-preview-12-2025'),
   accessToken: settingOrEnv(settings, 'accessToken', process.env.ACCESS_TOKEN),
   adminToken: settingOrEnv(settings, 'adminToken', process.env.ADMIN_TOKEN),
   defaultVoice: settingOrEnv(settings, 'defaultVoice', process.env.DEFAULT_VOICE, 'mimo_default'),

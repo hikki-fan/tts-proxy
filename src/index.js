@@ -4,6 +4,7 @@ const path = require('node:path');
 const { config, saveVoices, saveSettings, getSettingsView } = require('./config');
 const { AudioCache, cacheKey } = require('./cache');
 const { MimoClient } = require('./mimoClient');
+const { GeminiClient, GEMINI_NARRATION_PROMPT, GEMINI_USER_TEXT_PREFIX } = require('./geminiClient');
 const {
   decodeMaybeEncoded,
   normalizeFormat,
@@ -27,6 +28,11 @@ const mimo = new MimoClient({
   model: config.mimoModel,
   timeoutMs: config.requestTimeoutMs
 });
+const gemini = new GeminiClient({
+  apiKey: config.geminiApiKey,
+  model: config.geminiModel,
+  timeoutMs: config.requestTimeoutMs
+});
 
 app.set('trust proxy', true);
 app.use(express.json({ limit: '20mb' }));
@@ -41,7 +47,8 @@ app.get('/health', (req, res) => {
     service: 'mimo-tts-http-proxy',
     voices: config.voices.length,
     cacheEnabled: config.cacheEnabled,
-    mimoConfigured: Boolean(config.mimoApiKey)
+    mimoConfigured: Boolean(config.mimoApiKey),
+    geminiConfigured: Boolean(config.geminiApiKey)
   });
 });
 
@@ -140,6 +147,8 @@ app.get('/api/admin/config', assertAdmin, async (req, res, next) => {
         mimoConfigured: Boolean(config.mimoApiKey),
         mimoBaseUrl: config.mimoBaseUrl,
         mimoModel: config.mimoModel,
+        geminiConfigured: Boolean(config.geminiApiKey),
+        geminiModel: config.geminiModel,
         accessTokenEnabled: Boolean(config.accessToken),
         adminProtected: Boolean(config.adminToken),
         adminTokenConfigured: Boolean(config.adminToken),
@@ -160,7 +169,15 @@ app.get('/api/admin/config', assertAdmin, async (req, res, next) => {
       cache: await cache.stats()
     });
   } catch (error) {
-    next(error);
+    if (error.statusCode === 400) return next(error);
+    res.json({
+      ok: true,
+      ready: false,
+      cookie: '',
+      found: 0,
+      missing: ['sessionid', 'sid_guard', 'uid_tt'],
+      message: error.message || '等待浏览器登录中'
+    });
   }
 });
 
@@ -178,6 +195,11 @@ app.put('/api/admin/settings', assertAdmin, async (req, res, next) => {
       apiKey: config.mimoApiKey,
       baseUrl: config.mimoBaseUrl,
       model: config.mimoModel,
+      timeoutMs: config.requestTimeoutMs
+    });
+    gemini.update({
+      apiKey: config.geminiApiKey,
+      model: config.geminiModel,
       timeoutMs: config.requestTimeoutMs
     });
     res.json({ ok: true, settings });
@@ -220,15 +242,17 @@ app.get('/api/admin/stats', assertAdmin, (req, res) => {
       byModel: {
         standard: s.byModel.standard + (b.byModel?.standard || 0),
         design:   s.byModel.design   + (b.byModel?.design   || 0),
-        clone:    s.byModel.clone    + (b.byModel?.clone    || 0)
+        clone:    s.byModel.clone    + (b.byModel?.clone    || 0),
+        gemini:   s.byModel.gemini   + (b.byModel?.gemini   || 0)
       },
       byModelChars: {
         standard: s.byModelChars.standard + (b.byModelChars?.standard || 0),
         design:   s.byModelChars.design   + (b.byModelChars?.design   || 0),
-        clone:    s.byModelChars.clone    + (b.byModelChars?.clone    || 0)
+        clone:    s.byModelChars.clone    + (b.byModelChars?.clone    || 0),
+        gemini:   s.byModelChars.gemini   + (b.byModelChars?.gemini   || 0)
       }
     }),
-    { calls: 0, chars: 0, byModel: { standard: 0, design: 0, clone: 0 }, byModelChars: { standard: 0, design: 0, clone: 0 } }
+    { calls: 0, chars: 0, byModel: { standard: 0, design: 0, clone: 0, gemini: 0 }, byModelChars: { standard: 0, design: 0, clone: 0, gemini: 0 } }
   );
   res.json({ ...stats, total });
 });
@@ -271,6 +295,7 @@ app.post('/api/admin/clone-audio/:voiceId', assertAdmin, async (req, res, next) 
 app.get('/api/admin/emotion-defaults', assertAdmin, (req, res) => {
   res.json({ systemPrompt: DEFAULT_SYSTEM_PROMPT, userTemplate: DEFAULT_USER_TEMPLATE });
 });
+
 
 app.post('/api/admin/cache/clear', assertAdmin, async (req, res, next) => {
   try {
@@ -345,9 +370,12 @@ async function synthesizeAndSend(params, res, opts = {}) {
   }
 
   const voiceConfig = findVoiceConfig(params.voiceId, params.voice);
-  const format = normalizeFormat(params.format, config.defaultFormat);
+  const provider = normalizeProvider(params.provider || voiceConfig?.provider);
+  const requestedFormat = normalizeFormat(params.format, config.defaultFormat);
   const voice = String(params.voice || voiceConfig?.voice || config.defaultVoice);
-  const model = normalizeModel(params.model || voiceConfig?.model);
+  const model = provider === 'gemini'
+    ? normalizeGeminiModel(params.model || voiceConfig?.model || config.geminiModel)
+    : normalizeModel(params.model || voiceConfig?.model);
   const speed = normalizeSpeed(params.speed, config.defaultSpeed);
   const volume = String(params.volume || config.defaultVolume);
 
@@ -355,7 +383,6 @@ async function synthesizeAndSend(params, res, opts = {}) {
   const paramDesc = String(params.voiceDescription || '').trim();
   const voiceDescription = paramDesc || voiceConfig?.voiceDescription || '';
 
-  // 声音设计模型必须有描述；emotion 模式下模板已包含上下文，跳过此检查
   if (getModelMode(model) === 'design' && !emotionEnabled) {
     const explicit = decodeMaybeEncoded(params.userMessage);
     if (!explicit && !voiceDescription) {
@@ -367,8 +394,12 @@ async function synthesizeAndSend(params, res, opts = {}) {
 
   const userMessage = emotionEnabled ? '' : buildUserMessage({ speed, volume, explicit: params.userMessage, voiceDescription });
 
+  // gemini determines format at runtime; use requested format for cache key
+  const format = provider === 'gemini' ? (requestedFormat === 'mp3' ? 'mp3' : 'wav') : requestedFormat;
+
   const keyPayload = {
     text,
+    provider,
     voiceId: voiceConfig?.id || '',
     voice,
     speed,
@@ -377,14 +408,15 @@ async function synthesizeAndSend(params, res, opts = {}) {
     userMessage,
     model,
     emotionEnabled,
+    geminiNarrationPrompt: provider === 'gemini' ? `${GEMINI_NARRATION_PROMPT}\n${GEMINI_USER_TEXT_PREFIX}` : '',
     emotionSystemPrompt: emotionEnabled ? (config.emotionSystemPrompt || DEFAULT_SYSTEM_PROMPT) : '',
     emotionUserTemplate: emotionEnabled ? (config.emotionUserTemplate || DEFAULT_USER_TEMPLATE) : ''
   };
   const key = cacheKey(keyPayload);
   const cached = await cache.get(key, format);
   if (cached) {
-    console.log(`[TTS]  ${new Date().toISOString()} CACHE_HIT  voice=${voice} model=${model} chars=${text.length} format=${format} ${Date.now()-startMs}ms`);
-    if (opts.log) logger.logTtsCall({ chars: text.length, voice, format, model, cached: true, duration: Date.now() - startMs });
+    console.log(`[TTS]  ${new Date().toISOString()} CACHE_HIT  provider=${provider} voice=${voice} chars=${text.length} format=${format} ${Date.now()-startMs}ms`);
+    if (opts.log) logger.logTtsCall({ chars: text.length, provider, voice, format, model, cached: true, duration: Date.now() - startMs });
     return sendAudio(res, cached, format, true);
   }
 
@@ -407,12 +439,18 @@ async function synthesizeAndSend(params, res, opts = {}) {
     }
   }
 
-  const audio = await mimo.synthesize({ text, voice, format, userMessage, model, emotion, cloneAudioData });
-  await cache.set(key, format, audio);
+  let audio, actualFormat;
+  if (provider === 'gemini') {
+    ({ audio, format: actualFormat } = await gemini.synthesize({ text, voice, format, model }));
+  } else {
+    audio = await mimo.synthesize({ text, voice, format, userMessage, model, emotion, cloneAudioData });
+    actualFormat = format;
+  }
+  await cache.set(key, actualFormat, audio);
   const dur = Date.now() - startMs;
-  console.log(`[TTS]  ${new Date().toISOString()} SYNTH      voice=${voice} model=${model} chars=${text.length} format=${format} ${dur}ms`);
-  if (opts.log) logger.logTtsCall({ chars: text.length, voice, format, model, cached: false, duration: dur });
-  return sendAudio(res, audio, format, false);
+  console.log(`[TTS]  ${new Date().toISOString()} SYNTH      provider=${provider} voice=${voice} chars=${text.length} format=${actualFormat} ${dur}ms`);
+  if (opts.log) logger.logTtsCall({ chars: text.length, provider, voice, format: actualFormat, model, cached: false, duration: dur });
+  return sendAudio(res, audio, actualFormat, false);
 }
 
 function validateVoices(voices) {
@@ -451,9 +489,10 @@ function validateVoices(voices) {
       id,
       name,
       voice: voiceValue,
+      provider: normalizeProvider(voice.provider),
       language: String(voice.language || '').trim() || 'zh',
       gender: String(voice.gender || '').trim() || 'female',
-      model: normalizeOptionalModel(voice.model),
+      model: normalizeProvider(voice.provider) === 'gemini' ? '' : normalizeOptionalModel(voice.model),
       voiceDescription: decodeMaybeEncoded(voice.voiceDescription),
       description: String(voice.description || '').trim(),
       badge: String(voice.badge || '').trim(),
@@ -472,6 +511,12 @@ function validateVoices(voices) {
   });
 }
 
+function normalizeProvider(value) {
+  const v = String(value || '').trim().toLowerCase();
+  if (v === 'gemini') return 'gemini';
+  return 'mimo';
+}
+
 function normalizeModel(value) {
   const model = String(value || '').trim();
   if (!model) return config.mimoModel;
@@ -483,6 +528,12 @@ function normalizeOptionalModel(value) {
   const model = String(value || '').trim();
   return model ? normalizeModel(model) : '';
 }
+
+function normalizeGeminiModel(value) {
+  return String(value || config.geminiModel).trim().replace(/^models\//, '') || config.geminiModel;
+}
+
+
 
 function getModelMode(model) {
   const id = String(model || config.mimoModel);
@@ -532,6 +583,7 @@ function makeDesignVoice(body) {
     id,
     name,
     voice: String(body.voice || config.defaultVoice).trim() || config.defaultVoice,
+    provider: 'mimo',
     model,
     voiceDescription,
     language: String(body.language || '').trim() || 'zh',

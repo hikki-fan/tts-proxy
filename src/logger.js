@@ -58,7 +58,8 @@ function readDay(dateStr) {
 function getStats(period) {
   const now = new Date();
 
-  function modelMode(m) {
+  function modelMode(m, provider) {
+    if (provider === 'gemini') return 'gemini';
     if (!m) return 'standard';
     if (m.includes('voicedesign')) return 'design';
     if (m.includes('voiceclone')) return 'clone';
@@ -68,13 +69,13 @@ function getStats(period) {
   function emptyBucket(label) {
     return {
       label, calls: 0, chars: 0,
-      byModel:      { standard: 0, design: 0, clone: 0 },
-      byModelChars: { standard: 0, design: 0, clone: 0 }
+      byModel:      { standard: 0, design: 0, clone: 0, gemini: 0 },
+      byModelChars: { standard: 0, design: 0, clone: 0, gemini: 0 }
     };
   }
 
   function addRecord(bucket, r) {
-    const m = modelMode(r.model);
+    const m = modelMode(r.model, r.provider);
     const c = r.chars || 0;
     bucket.calls += 1;
     bucket.chars += c;

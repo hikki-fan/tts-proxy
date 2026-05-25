@@ -20,12 +20,13 @@ function decodeMaybeEncoded(value) {
 
 function normalizeFormat(value, defaultFormat) {
   const format = String(value || defaultFormat || 'mp3').toLowerCase();
-  if (format === 'wav' || format === 'pcm16' || format === 'mp3') return format;
+  if (format === 'wav' || format === 'pcm16' || format === 'mp3' || format === 'aac') return format;
   return defaultFormat || 'mp3';
 }
 
 function contentTypeForFormat(format) {
   if (format === 'wav') return 'audio/wav';
+  if (format === 'aac') return 'audio/aac';
   if (format === 'pcm16') return 'application/octet-stream';
   return 'audio/mpeg';
 }

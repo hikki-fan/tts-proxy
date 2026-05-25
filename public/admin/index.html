@@ -64,6 +64,7 @@
           </div>
           <div class="toolbar">
             <span id="mimoStatus" class="status">MiMo</span>
+            <span id="geminiStatus" class="status">Gemini</span>
             <span id="cacheStatus" class="status">Cache</span>
             <div class="topbar-actions">
               <button id="refreshBtn" type="button" class="icon-action-btn" title="刷新">
@@ -195,6 +196,10 @@
             <button id="saveSettingsBtn" form="settingsForm" type="submit" class="primary">保存配置</button>
           </div>
           <form id="settingsForm" class="settings-grid">
+            <div class="settings-section-title wide">
+              <strong>MiMo 配置</strong>
+              <span>小米 MiMo API、默认模型和基础连接参数</span>
+            </div>
             <label>
               <span>MiMo API Key</span>
               <input id="settingsMimoApiKey" type="password" autocomplete="off" placeholder="留空不修改">
@@ -210,6 +215,25 @@
               <span>默认模型</span>
               <select id="settingsMimoModel"></select>
             </label>
+            <div class="settings-section-title wide">
+              <strong>Gemini 配置</strong>
+              <span>Google Gemini TTS API Key 与模型</span>
+            </div>
+            <label>
+              <span>Gemini API Key</span>
+              <input id="settingsGeminiApiKey" type="password" autocomplete="off" placeholder="留空不修改">
+            </label>
+            <label class="check setting-check">
+              <input id="clearGeminiApiKey" type="checkbox"><span>清空 Gemini API Key</span>
+            </label>
+            <label>
+              <span>Gemini 模型</span>
+              <input id="settingsGeminiModel" placeholder="gemini-2.5-flash-native-audio-preview-12-2025">
+            </label>
+            <div class="settings-section-title wide">
+              <strong>通用配置</strong>
+              <span>订阅地址、默认格式、访问 Token 和管理 Token</span>
+            </div>
             <label class="wide">
               <span>对外访问地址（IP / 域名 / 端口）</span>
               <div class="host-port-row">
@@ -227,6 +251,7 @@
               <span>默认格式</span>
               <select id="settingsDefaultFormat">
                 <option value="mp3">mp3</option>
+                <option value="aac">aac</option>
                 <option value="wav">wav</option>
                 <option value="pcm16">pcm16</option>
               </select>
@@ -248,7 +273,8 @@
         <!-- 工作台（合成测试 + 情感分析 + 音色管理） -->
         <section id="studio" class="section studio-section" hidden>
           <div class="studio-tabs-bar">
-            <button type="button" class="studio-tab active" data-studio="test">合成测试</button>
+            <button type="button" class="studio-tab active" data-studio="test">MiMo 测试</button>
+            <button type="button" class="studio-tab" data-studio="gemini">Gemini 测试</button>
             <button type="button" class="studio-tab" data-studio="voices">音色管理</button>
             <span id="testState" class="muted studio-state">待测试</span>
           </div>
@@ -332,6 +358,7 @@
                   <span>格式</span>
                   <select id="testFormat">
                     <option value="mp3">mp3</option>
+                    <option value="aac">aac</option>
                     <option value="wav">wav</option>
                     <option value="pcm16">pcm16</option>
                   </select>
@@ -348,6 +375,42 @@
               </div>
             </form>
 
+          </div>
+
+          <!-- Gemini 测试面板 -->
+          <div id="studioGemini" class="studio-panel" hidden>
+            <div class="gemini-test-wrap">
+              <div class="gemini-status-row">
+                <span id="geminiTestStatus" class="status">Gemini 未配置</span>
+                <span class="muted">使用全局配置的 Gemini 模型与 API Key</span>
+              </div>
+              <div class="voice-block">
+                <div class="lang-row">
+                  <div class="lang-tabs" role="tablist">
+                    <button type="button" data-lang-g="zh" class="active">中文</button>
+                    <button type="button" data-lang-g="en">English</button>
+                  </div>
+                </div>
+                <div class="voice-cards-scroll">
+                  <div id="geminiVoiceCards" class="voice-cards"></div>
+                </div>
+                <p id="geminiVoiceSelectedBar" class="voice-selected-bar">未选择</p>
+              </div>
+              <form id="geminiTestForm">
+                <div class="test-grid">
+                  <label class="speed-label">
+                    <span>语速 <output id="geminiTestSpeedValue">1.0</output></span>
+                    <input id="geminiTestSpeed" type="range" min="0.6" max="1.4" step="0.1" value="1">
+                  </label>
+                  <label class="wide"><span>文本</span><textarea id="geminiTestText" spellcheck="false">这是一次 Gemini TTS 试听。</textarea></label>
+                  <div class="wide audio-row">
+                    <button type="submit" class="primary">生成试听</button>
+                    <span id="geminiTestState" class="muted">待测试</span>
+                    <audio id="geminiTestAudio" controls></audio>
+                  </div>
+                </div>
+              </form>
+            </div>
           </div>
 
           <!-- 音色管理面板 -->
@@ -370,6 +433,7 @@
                   <option value="standard">标准 TTS</option>
                   <option value="design">声音设计</option>
                   <option value="clone">声音克隆</option>
+                  <option value="gemini">Gemini</option>
                 </select>
               </div>
               <div class="toolbar">
@@ -387,7 +451,8 @@
                     <th class="th-avatar"></th>
                     <th>ID</th>
                     <th>名称</th>
-                    <th>MiMo voice</th>
+                    <th>Provider</th>
+                    <th>Voice / Speaker</th>
                     <th class="col-advanced" hidden>模型</th>
                     <th class="col-advanced" hidden>设计描述</th>
                     <th>语言</th>
@@ -499,6 +564,14 @@
     </div>
 
     <div id="toast" role="status" aria-live="polite"></div>
+    <datalist id="geminiVoiceDatalist">
+      <option value="Aoede"><option value="Kore"><option value="Zephyr">
+      <option value="Leda"><option value="Callirhoe"><option value="Gacrux">
+      <option value="Charon"><option value="Fenrir"><option value="Puck">
+      <option value="Orus"><option value="Achernar"><option value="Algenib">
+      <option value="Alnitak"><option value="Capella"><option value="Despina">
+      <option value="Erinome"><option value="Laomedeia"><option value="Sulafat">
+    </datalist>
     <script src="/admin/app.js"></script>
   </body>
 </html>

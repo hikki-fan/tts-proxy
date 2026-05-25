@@ -11,6 +11,7 @@
     "badge": "默认推荐",
     "color": "#4f8df7",
     "order": 10,
+    "provider": "mimo",
     "cloneAudioFile": ""
   },
   {
@@ -25,6 +26,7 @@
     "badge": "适合叙述",
     "color": "#20c997",
     "order": 20,
+    "provider": "mimo",
     "cloneAudioFile": ""
   },
   {
@@ -39,6 +41,7 @@
     "badge": "适合口播",
     "color": "#ff8a24",
     "order": 30,
+    "provider": "mimo",
     "cloneAudioFile": ""
   },
   {
@@ -53,6 +56,7 @@
     "badge": "适合故事",
     "color": "#7c4dff",
     "order": 40,
+    "provider": "mimo",
     "cloneAudioFile": ""
   },
   {
@@ -67,6 +71,7 @@
     "badge": "稳定",
     "color": "#0f766e",
     "order": 50,
+    "provider": "mimo",
     "cloneAudioFile": ""
   },
   {
@@ -81,6 +86,7 @@
     "badge": "Clear",
     "color": "#f06292",
     "order": 60,
+    "provider": "mimo",
     "cloneAudioFile": ""
   },
   {
@@ -95,6 +101,7 @@
     "badge": "Soft",
     "color": "#26a69a",
     "order": 70,
+    "provider": "mimo",
     "cloneAudioFile": ""
   },
   {
@@ -109,6 +116,7 @@
     "badge": "Narration",
     "color": "#5c6bc0",
     "order": 80,
+    "provider": "mimo",
     "cloneAudioFile": ""
   },
   {
@@ -123,6 +131,112 @@
     "badge": "一位温润沉稳的青年男性旁白，年龄约30岁，普通话标准，声音干净、磁性但不过分低沉，语气自然、有故事感，适合长时间朗读小说。  整体风格像深夜电台和有声书主播的结合，语速中等偏慢，吐字清晰，停顿自然，情绪表达克制但有层次。旁白部分保持平稳、耐听、沉浸；人物对白可根据语境轻微变化语气，但不要夸张表演，不要动漫腔，不要播音腔，不要过度抑扬顿挫。  朗读时注意章节感、画面感和悬念感。",
     "color": "",
     "order": 90,
+    "provider": "mimo",
+    "cloneAudioFile": ""
+  },
+  {
+    "id": "gemini-aoede",
+    "name": "Aoede",
+    "voice": "Aoede",
+    "model": "",
+    "voiceDescription": "",
+    "language": "zh",
+    "gender": "female",
+    "description": "Gemini 女声，清亮自然",
+    "badge": "Gemini",
+    "color": "#1a73e8",
+    "order": 200,
+    "provider": "gemini",
+    "cloneAudioFile": ""
+  },
+  {
+    "id": "gemini-kore",
+    "name": "Kore",
+    "voice": "Kore",
+    "model": "",
+    "voiceDescription": "",
+    "language": "zh",
+    "gender": "female",
+    "description": "Gemini 女声，柔和稳重",
+    "badge": "Gemini",
+    "color": "#1a73e8",
+    "order": 210,
+    "provider": "gemini",
+    "cloneAudioFile": ""
+  },
+  {
+    "id": "gemini-zephyr",
+    "name": "Zephyr",
+    "voice": "Zephyr",
+    "model": "",
+    "voiceDescription": "",
+    "language": "zh",
+    "gender": "female",
+    "description": "Gemini 女声，明快轻盈",
+    "badge": "Gemini",
+    "color": "#1a73e8",
+    "order": 220,
+    "provider": "gemini",
+    "cloneAudioFile": ""
+  },
+  {
+    "id": "gemini-charon",
+    "name": "Charon",
+    "voice": "Charon",
+    "model": "",
+    "voiceDescription": "",
+    "language": "zh",
+    "gender": "male",
+    "description": "Gemini 男声，沉稳有力",
+    "badge": "Gemini",
+    "color": "#1a73e8",
+    "order": 230,
+    "provider": "gemini",
+    "cloneAudioFile": ""
+  },
+  {
+    "id": "gemini-fenrir",
+    "name": "Fenrir",
+    "voice": "Fenrir",
+    "model": "",
+    "voiceDescription": "",
+    "language": "zh",
+    "gender": "male",
+    "description": "Gemini 男声，低沉磁性",
+    "badge": "Gemini",
+    "color": "#1a73e8",
+    "order": 240,
+    "provider": "gemini",
+    "cloneAudioFile": ""
+  },
+  {
+    "id": "gemini-puck",
+    "name": "Puck",
+    "voice": "Puck",
+    "model": "",
+    "voiceDescription": "",
+    "language": "en",
+    "gender": "male",
+    "description": "Gemini English male voice",
+    "badge": "Gemini",
+    "color": "#1a73e8",
+    "order": 250,
+    "provider": "gemini",
+    "cloneAudioFile": ""
+  },
+  {
+    "id": "gemini-leda",
+    "name": "Leda",
+    "voice": "Leda",
+    "model": "",
+    "voiceDescription": "",
+    "language": "en",
+    "gender": "female",
+    "description": "Gemini English female voice",
+    "badge": "Gemini",
+    "color": "#1a73e8",
+    "order": 260,
+    "provider": "gemini",
     "cloneAudioFile": ""
   }
 ]

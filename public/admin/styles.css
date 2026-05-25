@@ -570,6 +570,37 @@ h4 { font-size: 13px; font-weight: 600; }
 
 .setting-check { align-self: end; min-height: 38px; }
 
+.settings-section-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: var(--bg);
+  margin-top: 4px;
+}
+
+.settings-section-title strong {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.settings-section-title span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.cookie-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 2px 0 4px;
+}
+
+.cookie-actions .muted { font-size: 12px; }
+
 .token-label-row {
   display: flex;
   align-items: center;
@@ -1101,6 +1132,8 @@ td:last-child, th:last-child { width: 120px; }
 }
 
 .clone-voice-cell { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.gemini-test-wrap { padding: 20px; display: flex; flex-direction: column; gap: 18px; }
+.gemini-status-row { display: flex; align-items: center; gap: 10px; }
 
 .check {
   display: flex;
@@ -1412,6 +1445,21 @@ td:last-child, th:last-child { width: 120px; }
   gap: 10px;
   width: 100%;
   justify-content: center;
+}
+
+.cookie-modal-card {
+  width: min(430px, calc(100vw - 32px));
+}
+
+.cookie-modal-status {
+  width: 100%;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 12px;
+  padding: 10px 12px;
+  text-align: left;
 }
 
 /* ─── Topbar Icon Actions ────────────────────────────────────────────────── */

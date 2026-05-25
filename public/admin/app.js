@@ -13,7 +13,10 @@ const state = {
   statsData: null,
   activeTab: 'overview',
   studioTab: 'test',
-  voiceTab: 'preset'
+  voiceTab: 'preset',
+  geminiLang: 'zh',
+  geminiVoiceId: '',
+  geminiVoice: ''
 };
 
 // MiMo v2.5 预设音色列表
@@ -32,13 +35,14 @@ const PRESET_VOICES = [
 ];
 
 function buildVoiceOptions(selected) {
-  const presetValues = new Set(PRESET_VOICES.map(v => v.value));
+  const presets = PRESET_VOICES;
+  const presetValues = new Set(presets.map(v => v.value));
   // 补充 state.voices 中不在预设里的 voice 值
   const extras = [...new Set(
     state.voices.map(v => v.voice).filter(v => v && v !== 'clone' && !presetValues.has(v))
   )];
   const all = [
-    ...PRESET_VOICES,
+    ...presets,
     ...extras.map(v => ({ value: v, label: v }))
   ];
   return all.map(opt =>
@@ -157,7 +161,7 @@ function switchTab(tabId) {
 }
 
 function switchStudioTab(tab) {
-  ['test', 'voices'].forEach((t) => {
+  ['test', 'gemini', 'voices'].forEach((t) => {
     const panel = document.getElementById(`studio${t.charAt(0).toUpperCase() + t.slice(1)}`);
     if (panel) panel.hidden = t !== tab;
   });
@@ -325,6 +329,17 @@ function bindEvents() {
   });
   document.getElementById('downloadQrBtn').addEventListener('click', downloadQrImage);
   $('#testForm').addEventListener('submit', runTest);
+  $('#geminiTestForm').addEventListener('submit', runGeminiTest);
+  $('#geminiTestSpeed').addEventListener('input', () => {
+    $('#geminiTestSpeedValue').textContent = Number($('#geminiTestSpeed').value).toFixed(1);
+  });
+  document.querySelectorAll('[data-lang-g]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.geminiLang = btn.dataset.langG;
+      document.querySelectorAll('[data-lang-g]').forEach(b => b.classList.toggle('active', b.dataset.langG === state.geminiLang));
+      renderGeminiVoiceCards();
+    });
+  });
   $('#testSpeed').addEventListener('input', () => {
     $('#testSpeedValue').textContent = Number($('#testSpeed').value).toFixed(1);
   });
@@ -466,6 +481,7 @@ async function loadConfig(notify = false) {
     renderModeFields();
     renderLanguageTabs();
     renderVoiceOptions();
+    renderGeminiVoiceCards();
     renderVoices(data.voices);
     await loadSourcePreview();
     await loadStats();
@@ -501,8 +517,8 @@ async function loadStats() {
   }
 }
 
-const MODEL_COLORS = { standard: '#4f6ef2', design: '#7c3aed', clone: '#0d9488' };
-const MODEL_LABELS = { standard: '标准 TTS', design: '声音设计', clone: '声音克隆' };
+const MODEL_COLORS = { standard: '#4f6ef2', design: '#7c3aed', clone: '#0d9488', gemini: '#1a73e8' };
+const MODEL_LABELS = { standard: 'MiMo 标准', design: '声音设计', clone: '声音克隆', gemini: 'Gemini' };
 
 function renderStatsTotal(total) {
   const el = $('#statsTotals');
@@ -529,7 +545,8 @@ function renderStatsTotal(total) {
 const MODEL_BAR_COLORS = {
   standard: 'rgba(79,110,242,0.82)',
   design:   'rgba(13,148,136,0.82)',
-  clone:    'rgba(6,182,212,0.75)'
+  clone:    'rgba(6,182,212,0.75)',
+  gemini:   'rgba(26,115,232,0.78)'
 };
 
 /* ─── Professional Chart ─────────────────────────────────────────────────── */
@@ -670,7 +687,7 @@ function renderChart(data) {
       const cx = toX(i);
       const totalH = baseY - toY(total); // curve height at this bucket
       let stackY = baseY;
-      ['standard', 'design', 'clone'].forEach(m => {
+      ['standard', 'design', 'clone', 'doubao'].forEach(m => {
         const cnt = bm[m] || 0;
         if (!cnt) return;
         const segH = Math.max(1, (cnt / total) * totalH);
@@ -737,7 +754,7 @@ function renderChart(data) {
     const b = buckets[closest];
     const total = mode === 'calls' ? b.calls : b.chars;
     const bm = mode === 'calls' ? (b.byModel||{}) : (b.byModelChars||{});
-    const rows = ['standard','design','clone']
+    const rows = ['standard','design','clone','doubao']
       .filter(m => (bm[m]||0) > 0)
       .map(m => `<div class="ct-row"><i style="background:${MODEL_BAR_COLORS[m]}"></i><span>${MODEL_LABELS[m]}</span><strong>${fmtNum(bm[m]||0)}</strong></div>`)
       .join('');
@@ -826,6 +843,7 @@ function filterVoiceRows() {
     const rowLang = row.querySelector('[data-field="language"]')?.value || '';
     const rowGender = row.querySelector('[data-field="gender"]')?.value || '';
     const rowModel = row.querySelector('[data-field="model"]')?.value || '';
+    const rowProvider = row.querySelector('[data-field="provider"]')?.value || 'mimo';
 
     const modeMatch = () => {
       if (!modelFilter) return true;
@@ -889,6 +907,8 @@ function renderConfig(data) {
 
   setStatus($('#mimoStatus'), data.service.mimoConfigured ? 'MiMo 已配置' : 'MiMo 未配置', data.service.mimoConfigured);
   setStatus($('#cacheStatus'), data.cache.enabled ? `缓存 ${data.cache.count}` : '缓存关闭', data.cache.enabled);
+  const geminiStatus = $('#geminiStatus');
+  if (geminiStatus) setStatus(geminiStatus, data.service.geminiConfigured ? 'Gemini 已配置' : 'Gemini 未配置', data.service.geminiConfigured);
   updateSelectedVoiceField();
 }
 
@@ -948,6 +968,12 @@ function renderSettings(data) {
   const settings = data.settings || {};
   $('#settingsMimoBaseUrl').value = settings.mimoBaseUrl || '';
   $('#settingsMimoModel').value = settings.mimoModel || data.service.mimoModel;
+  $('#settingsGeminiModel').value = settings.geminiModel || data.service.geminiModel || '';
+  $('#settingsGeminiApiKey').value = '';
+  $('#settingsGeminiApiKey').placeholder = settings.geminiApiKeyConfigured
+    ? `已配置 ${settings.geminiApiKeyMasked}`
+    : '未配置，输入后保存';
+  $('#clearGeminiApiKey').checked = false;
   renderPublicBaseUrl(settings.publicBaseUrl || '');
   renderDefaultVoiceSelect(settings.defaultVoice || data.service.defaultVoice || '');
   $('#settingsDefaultFormat').value = settings.defaultFormat || data.service.defaultFormat || 'mp3';
@@ -1293,9 +1319,17 @@ function addVoiceRow(voice = {}) {
     </td>
     <td><input data-field="id" value="${escapeAttr(voice.id || `mimo-custom-${index}`)}"></td>
     <td><input data-field="name" value="${escapeAttr(name)}"></td>
-    <td>${isClone
+    <td>
+      <select data-field="provider">
+        <option value="mimo" ${(voice.provider || 'mimo') !== 'gemini' ? 'selected' : ''}>MiMo</option>
+        <option value="gemini" ${voice.provider === 'gemini' ? 'selected' : ''}>Gemini</option>
+      </select>
+    </td>
+    <td class="td-voice">${isClone
       ? `<span class="clone-voice-cell">${voice.cloneAudioReady ? '✓ 已上传音频' : '⚠ 未上传音频'}</span><input data-field="voice" type="hidden" value="${escapeAttr(voice.voice || 'clone')}">`
-      : `<select data-field="voice">${buildVoiceOptions(voice.voice || 'mimo_default')}</select>`
+      : voice.provider === 'gemini'
+        ? `<input data-field="voice" list="geminiVoiceDatalist" value="${escapeAttr(voice.voice || 'Aoede')}" placeholder="如 Aoede, Charon...">`
+        : `<select data-field="voice">${buildVoiceOptions(voice.voice || 'mimo_default')}</select>`
     }</td>
     <td class="col-advanced"${showAdv ? '' : ' hidden'}>
       <select data-field="model">
@@ -1329,6 +1363,17 @@ function addVoiceRow(voice = {}) {
     </td>
   `;
   tbody.append(row);
+
+  row.querySelector('[data-field="provider"]').addEventListener('change', function () {
+    const isGemini = this.value === 'gemini';
+    const voiceTd = row.querySelector('.td-voice');
+    const curVoice = voiceTd.querySelector('[data-field="voice"]')?.value || '';
+    if (isGemini) {
+      voiceTd.innerHTML = `<input data-field="voice" list="geminiVoiceDatalist" value="${escapeAttr(curVoice || 'Aoede')}" placeholder="如 Aoede, Charon...">`;
+    } else {
+      voiceTd.innerHTML = `<select data-field="voice">${buildVoiceOptions(curVoice && curVoice !== 'Aoede' ? curVoice : 'mimo_default')}</select>`;
+    }
+  });
 }
 
 async function saveVoices() {
@@ -1348,17 +1393,21 @@ async function saveSettings(event) {
     publicBaseUrl: assemblePublicBaseUrl(),
     mimoBaseUrl: $('#settingsMimoBaseUrl').value.trim(),
     mimoModel: $('#settingsMimoModel').value,
+    geminiModel: $('#settingsGeminiModel').value.trim(),
     defaultVoice: $('#settingsDefaultVoice').value.trim(),
     defaultFormat: $('#settingsDefaultFormat').value,
     requestTimeoutMs: Number($('#settingsRequestTimeoutMs').value) || 120000,
     clearMimoApiKey: $('#clearMimoApiKey').checked,
+    clearGeminiApiKey: $('#clearGeminiApiKey').checked,
     clearAccessToken: $('#clearAccessToken').checked,
     clearAdminToken: $('#clearAdminToken').checked
   };
 
   const mimoApiKey = $('#settingsMimoApiKey').value.trim();
+  const geminiApiKey = $('#settingsGeminiApiKey').value.trim();
   const accessToken = $('#settingsAccessToken').value.trim();
   if (mimoApiKey) body.mimoApiKey = mimoApiKey;
+  if (geminiApiKey) body.geminiApiKey = geminiApiKey;
   if (accessToken) body.accessToken = accessToken;
   if (newAdminToken) body.adminToken = newAdminToken;
 
@@ -1428,6 +1477,7 @@ function collectVoices() {
       id: value('id'),
       name: value('name'),
       voice: voiceId,
+      provider: value('provider') || 'mimo',
       language: value('language') || 'zh',
       gender: value('gender') || 'female',
       model,
@@ -1470,6 +1520,85 @@ async function clearCache() {
   const result = await adminJson('/api/admin/cache/clear', { method: 'POST' });
   toast(`已清理 ${result.deleted} 个缓存文件`);
   await loadConfig(false);
+}
+
+function renderGeminiVoiceCards() {
+  const container = $('#geminiVoiceCards');
+  if (!container) return;
+  const voices = state.voices
+    .filter(v => v.provider === 'gemini' && v.language === (state.geminiLang || 'zh'))
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+  container.innerHTML = '';
+  voices.forEach(v => {
+    const card = document.createElement('div');
+    card.className = `voice-card${v.id === state.geminiVoiceId ? ' active' : ''}`;
+    card.dataset.voiceId = v.id;
+    const color = voiceAvatarColor(v.name);
+    const initial = [...v.name][0];
+    card.innerHTML = `
+      <div class="voice-avatar-wrap"><div class="voice-avatar" style="background:${color}">${escapeHtml(initial)}</div></div>
+      <div class="voice-card-name" title="${escapeAttr(v.name)}">${escapeHtml(v.name)}</div>
+      <div class="voice-card-lang">${v.gender === 'male' ? '男声' : '女声'}</div>
+    `;
+    card.addEventListener('click', () => {
+      state.geminiVoiceId = v.id;
+      state.geminiVoice = v.voice;
+      document.querySelectorAll('#geminiVoiceCards .voice-card').forEach(c => {
+        c.classList.toggle('active', c.dataset.voiceId === v.id);
+      });
+      const bar = $('#geminiVoiceSelectedBar');
+      if (bar) bar.textContent = `已选择：${v.name}`;
+    });
+    container.appendChild(card);
+  });
+  if (!state.geminiVoiceId && voices.length) {
+    state.geminiVoiceId = voices[0].id;
+    state.geminiVoice = voices[0].voice;
+    container.querySelector('.voice-card')?.classList.add('active');
+    const bar = $('#geminiVoiceSelectedBar');
+    if (bar) bar.textContent = `已选择：${voices[0].name}`;
+  }
+}
+
+async function runGeminiTest(event) {
+  event.preventDefault();
+  const stateText = $('#geminiTestState');
+  stateText.textContent = '生成中';
+
+  if (!state.geminiVoiceId) {
+    stateText.textContent = '请先选择 Gemini 音色';
+    return;
+  }
+
+  try {
+    const response = await fetch('/api/admin/test-tts', {
+      method: 'POST',
+      headers: adminHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        voiceId: state.geminiVoiceId,
+        provider: 'gemini',
+        voice: state.geminiVoice,
+        format: 'wav',
+        speed: $('#geminiTestSpeed').value,
+        text: $('#geminiTestText').value
+      })
+    });
+
+    if (!response.ok) {
+      const err = await safeJson(response);
+      throw new Error(err.error || `HTTP ${response.status}`);
+    }
+
+    const blob = await response.blob();
+    const audio = $('#geminiTestAudio');
+    if (audio.src) URL.revokeObjectURL(audio.src);
+    audio.src = URL.createObjectURL(blob);
+    stateText.textContent = `${formatBytes(blob.size)} · ${response.headers.get('x-cache') || 'MISS'}`;
+    await audio.play().catch(() => {});
+  } catch (error) {
+    stateText.textContent = '失败';
+    toast(error.message);
+  }
 }
 
 async function runTest(event) {

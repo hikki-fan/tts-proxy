@@ -9,11 +9,16 @@ function getOrigin(req, configuredBaseUrl) {
 
 function makeTtsUrl(origin, voice, options) {
   const params = new URLSearchParams();
+  const provider = voice.provider === 'gemini' ? 'gemini' : 'mimo';
+  const format = provider === 'gemini' ? 'wav' : options.format;
   params.set('voiceId', voice.id);
   params.set('voice', voice.voice);
-  params.set('model', voice.model || options.model);
+  params.set('provider', provider);
+  params.set('model', provider === 'gemini'
+    ? (voice.model || options.geminiModel || '')
+    : (voice.model || options.model));
   params.set('speed', '{{speakSpeed}}');
-  params.set('format', options.format);
+  params.set('format', format);
   if (voice.voiceDescription) params.set('voiceDescription', voice.voiceDescription);
   params.set('text', '{{java.encodeURI(java.encodeURI(speakText))}}');
   if (options.accessToken) params.set('token', options.accessToken);
@@ -26,12 +31,18 @@ function makeTtsUrl(origin, voice, options) {
 
 function makeVoiceSource(origin, voice, options) {
   const now = String(options.now || Date.now());
+  const effectiveFormat = voice.provider === 'gemini' ? 'wav' : options.format;
+  const contentType = effectiveFormat === 'wav'
+    ? 'audio/wav'
+    : effectiveFormat === 'aac'
+      ? 'audio/aac'
+      : 'audio/mpeg';
   const common = {
     id: voice.id,
     name: voice.name,
     api: 'http',
     url: makeTtsUrl(origin, voice, options),
-    contentType: options.format === 'wav' ? 'audio/wav' : 'audio/mpeg',
+    contentType,
     customOrder: String(voice.order),
     concurrentRate: String(options.concurrentRate || 1),
     enabledCookieJar: options.legacy ? '0' : false,
@@ -68,6 +79,7 @@ function makeVoiceSources(req, config, options = {}) {
       concurrentRate: options.concurrentRate || 1,
       format: options.format || config.defaultFormat,
       legacy: options.legacy,
+      geminiModel: options.geminiModel || config.geminiModel,
       model: options.model || config.mimoModel,
       now: options.now
     }));
