@@ -1855,6 +1855,101 @@ td:last-child, th:last-child { width: 120px; }
 }
 .confirm-actions button { flex: 1; }
 
+/* ─── Clone Audio Modal ───────────────────────────────────────────────────── */
+
+.clone-audio-card {
+  width: min(400px, calc(100vw - 32px));
+  align-items: stretch;
+  text-align: left;
+}
+.clone-audio-card h2 { text-align: center; }
+.clone-audio-tip { text-align: center; margin: 0 0 14px; }
+
+.clone-audio-choice-btns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.clone-choice-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 18px 12px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--line);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  min-height: unset;
+}
+.clone-choice-btn:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.clone-choice-btn span { font-size: 13px; font-weight: 600; }
+.clone-choice-btn small { font-size: 11px; color: var(--muted); font-weight: 400; }
+
+/* Recording UI */
+.record-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 14px 0 10px;
+}
+.record-dot {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: background 0.3s;
+}
+.record-dot.recording { background: var(--danger); animation: rec-pulse 1s ease-in-out infinite; }
+@keyframes rec-pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+.record-time { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: 0.05em; }
+
+.record-bar-wrap { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+.record-bar-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line);
+  position: relative;
+  overflow: visible;
+}
+.record-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--danger);
+  width: 0%;
+  transition: width 0.9s linear;
+}
+.record-bar-min {
+  position: absolute;
+  left: calc(5/30*100%);
+  top: -3px;
+  width: 2px;
+  height: 12px;
+  background: var(--muted);
+  border-radius: 1px;
+}
+.record-bar-label { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+.record-ctrl { display: flex; justify-content: center; margin-bottom: 4px; }
+.record-done-actions { display: flex; gap: 10px; margin-top: 10px; }
+.record-done-actions button { flex: 1; }
+
+.clone-audio-back {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 4px 0;
+  min-height: unset;
+  margin-top: 8px;
+  cursor: pointer;
+}
+.clone-audio-back:hover { color: var(--accent); }
+
 /* ─── Guide Steps Modal ───────────────────────────────────────────────────── */
 
 .mimo-key-modal-card {

@@ -640,6 +640,59 @@
       </div>
     </div>
 
+    <!-- 克隆音频：上传 / 录制 -->
+    <div id="cloneAudioModal" class="modal-overlay" hidden>
+      <div class="modal-card clone-audio-card">
+        <h2>添加音频样本</h2>
+
+        <!-- Step 1: 选择方式 -->
+        <div id="cloneAudioStep1">
+          <p class="section-note clone-audio-tip">请在安静的环境中录制 5~30 秒的音频</p>
+          <div class="clone-audio-choice-btns">
+            <button type="button" id="cloneChooseRecord" class="clone-choice-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="28" height="28"><rect x="9" y="2" width="6" height="13" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>
+              <span>录制音频</span>
+              <small>使用麦克风</small>
+            </button>
+            <button type="button" id="cloneChooseFile" class="clone-choice-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="28" height="28"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+              <span>选择文件</span>
+              <small>MP3 / WAV</small>
+            </button>
+          </div>
+        </div>
+
+        <!-- Step 2: 录制 -->
+        <div id="cloneAudioStep2" hidden>
+          <p class="section-note clone-audio-tip">请在安静的环境中录制，建议 5~30 秒</p>
+          <div class="record-display">
+            <div class="record-dot" id="recordDot"></div>
+            <div class="record-time" id="recordTime">00:00</div>
+          </div>
+          <div class="record-bar-wrap">
+            <div class="record-bar-track">
+              <div class="record-bar-fill" id="recordBarFill"></div>
+              <div class="record-bar-min"></div>
+            </div>
+            <span class="record-bar-label">30s</span>
+          </div>
+          <div class="record-ctrl">
+            <button type="button" id="recordToggleBtn" class="primary">开始录制</button>
+          </div>
+          <div id="recordPreviewWrap" hidden>
+            <audio id="recordPreviewAudio" controls style="width:100%;margin-top:10px"></audio>
+            <div class="record-done-actions">
+              <button type="button" id="recordConfirmBtn" class="primary">确认上传</button>
+              <button type="button" id="recordRetryBtn">重新录制</button>
+            </div>
+          </div>
+          <button type="button" id="cloneAudioBack" class="clone-audio-back">← 返回</button>
+        </div>
+
+        <button type="button" id="cloneAudioCancel" style="margin-top:6px;width:100%">取消</button>
+      </div>
+    </div>
+
     <!-- 删除克隆音色二次确认 -->
     <div id="deleteCloneModal" class="modal-overlay" hidden>
       <div class="modal-card confirm-modal-card">

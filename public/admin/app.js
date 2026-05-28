@@ -414,6 +414,8 @@ function bindEvents() {
     }
   });
 
+  _initCloneAudioModalEvents();
+
   window._showDeleteCloneConfirm = (voice) => {
     _deleteCloneTarget = voice;
     document.getElementById('deleteCloneDesc').textContent = `确认删除克隆音色「${voice.name}」？删除后无法恢复。`;
@@ -1322,33 +1324,198 @@ function makeVoiceCard(voice, isClone) {
   return card;
 }
 
-async function uploadCloneAudio(voiceId) {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'audio/mpeg,audio/mp3,audio/wav,.mp3,.wav';
-  input.addEventListener('change', async () => {
-    const file = input.files[0];
-    if (!file) return;
-    if (file.size > 10 * 1024 * 1024) { toast('文件不能超过 10MB'); return; }
-    toast('上传中…');
+function uploadCloneAudio(voiceId) {
+  showCloneAudioModal(voiceId);
+}
+
+// ─── 克隆音频 Modal ───────────────────────────────────────────────────────────
+
+let _cloneVoiceId = null;
+let _mediaRecorder = null;
+let _recChunks = [];
+let _recTimerId = null;
+let _recSeconds = 0;
+let _recBlob = null;
+
+function showCloneAudioModal(voiceId) {
+  _cloneVoiceId = voiceId;
+  _resetRecordStep();
+  document.getElementById('cloneAudioStep1').hidden = false;
+  document.getElementById('cloneAudioStep2').hidden = true;
+  document.getElementById('cloneAudioModal').hidden = false;
+}
+
+function _resetRecordStep() {
+  _stopRecording();
+  _recBlob = null;
+  _recSeconds = 0;
+  document.getElementById('recordDot').className = 'record-dot';
+  document.getElementById('recordTime').textContent = '00:00';
+  document.getElementById('recordBarFill').style.width = '0%';
+  document.getElementById('recordToggleBtn').textContent = '开始录制';
+  document.getElementById('recordPreviewWrap').hidden = true;
+  document.getElementById('recordToggleBtn').hidden = false;
+  const audio = document.getElementById('recordPreviewAudio');
+  if (audio.src) { URL.revokeObjectURL(audio.src); audio.src = ''; }
+}
+
+function _stopRecording() {
+  clearInterval(_recTimerId);
+  _recTimerId = null;
+  if (_mediaRecorder && _mediaRecorder.state !== 'inactive') _mediaRecorder.stop();
+  _mediaRecorder = null;
+}
+
+async function _doUploadAudioData(dataUrl) {
+  toast('上传中…');
+  await adminJson(`/api/admin/clone-audio/${encodeURIComponent(_cloneVoiceId)}`, {
+    method: 'POST',
+    body: JSON.stringify({ audioData: dataUrl })
+  });
+  toast('音频样本已上传，克隆音色已就绪');
+  document.getElementById('cloneAudioModal').hidden = true;
+  await loadConfig(false);
+}
+
+function _audioBufferToWavDataUrl(buffer) {
+  const numCh = buffer.numberOfChannels;
+  const sr = buffer.sampleRate;
+  const len = buffer.length;
+  const ab = new ArrayBuffer(44 + len * 2);
+  const view = new DataView(ab);
+  const writeStr = (off, s) => { for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i)); };
+  writeStr(0, 'RIFF'); view.setUint32(4, 36 + len * 2, true);
+  writeStr(8, 'WAVE'); writeStr(12, 'fmt ');
+  view.setUint32(16, 16, true); view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true); view.setUint32(24, sr, true);
+  view.setUint32(28, sr * 2, true); view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true); writeStr(36, 'data');
+  view.setUint32(40, len * 2, true);
+  const samples = new Int16Array(ab, 44);
+  const ch = [];
+  for (let c = 0; c < numCh; c++) ch.push(buffer.getChannelData(c));
+  for (let i = 0; i < len; i++) {
+    let s = 0;
+    for (let c = 0; c < numCh; c++) s += ch[c][i];
+    samples[i] = Math.max(-32768, Math.min(32767, Math.round(s / numCh * 32767)));
+  }
+  const bytes = new Uint8Array(ab);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return 'data:audio/wav;base64,' + btoa(bin);
+}
+
+function _initCloneAudioModalEvents() {
+  document.getElementById('cloneChooseRecord').addEventListener('click', () => {
+    document.getElementById('cloneAudioStep1').hidden = true;
+    document.getElementById('cloneAudioStep2').hidden = false;
+    _resetRecordStep();
+  });
+
+  document.getElementById('cloneChooseFile').addEventListener('click', () => {
+    document.getElementById('cloneAudioModal').hidden = true;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'audio/mpeg,audio/mp3,audio/wav,.mp3,.wav';
+    input.addEventListener('change', async () => {
+      const file = input.files[0];
+      if (!file) return;
+      if (file.size > 10 * 1024 * 1024) { toast('文件不能超过 10MB'); return; }
+      try {
+        const dataUrl = await new Promise((res, rej) => {
+          const r = new FileReader();
+          r.onload = e => res(e.target.result);
+          r.onerror = rej;
+          r.readAsDataURL(file);
+        });
+        await _doUploadAudioData(dataUrl);
+      } catch (err) { toast(err.message); }
+    });
+    input.click();
+  });
+
+  document.getElementById('recordToggleBtn').addEventListener('click', async () => {
+    if (_mediaRecorder && _mediaRecorder.state === 'recording') {
+      _mediaRecorder.stop();
+      return;
+    }
+    // Start
     try {
-      const base64 = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-      await adminJson(`/api/admin/clone-audio/${encodeURIComponent(voiceId)}`, {
-        method: 'POST',
-        body: JSON.stringify({ audioData: base64 })
-      });
-      toast('音频样本已上传，克隆音色已就绪');
-      await loadConfig(false);
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      _recChunks = [];
+      _recSeconds = 0;
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : '';
+      _mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+      _mediaRecorder.ondataavailable = e => { if (e.data.size > 0) _recChunks.push(e.data); };
+      _mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        clearInterval(_recTimerId);
+        document.getElementById('recordDot').className = 'record-dot';
+        document.getElementById('recordToggleBtn').hidden = true;
+        const blob = new Blob(_recChunks, { type: _mediaRecorder.mimeType || 'audio/webm' });
+        try {
+          const arrayBuf = await blob.arrayBuffer();
+          const audioCtx = new AudioContext();
+          const decoded = await audioCtx.decodeAudioData(arrayBuf);
+          await audioCtx.close();
+          _recBlob = _audioBufferToWavDataUrl(decoded);
+        } catch {
+          // fallback: use blob directly as base64
+          _recBlob = await new Promise((res, rej) => {
+            const r = new FileReader(); r.onload = e => res(e.target.result); r.onerror = rej;
+            r.readAsDataURL(blob);
+          });
+        }
+        const audio = document.getElementById('recordPreviewAudio');
+        audio.src = URL.createObjectURL(blob);
+        document.getElementById('recordPreviewWrap').hidden = false;
+      };
+      _mediaRecorder.start(100);
+      document.getElementById('recordDot').className = 'record-dot recording';
+      document.getElementById('recordToggleBtn').textContent = '停止录制';
+      _recTimerId = setInterval(() => {
+        _recSeconds++;
+        const m = String(Math.floor(_recSeconds / 60)).padStart(2, '0');
+        const s = String(_recSeconds % 60).padStart(2, '0');
+        document.getElementById('recordTime').textContent = `${m}:${s}`;
+        document.getElementById('recordBarFill').style.width = `${Math.min(100, _recSeconds / 30 * 100)}%`;
+        if (_recSeconds >= 30) _mediaRecorder?.stop();
+      }, 1000);
     } catch (err) {
-      toast(err.message);
+      toast('无法访问麦克风：' + (err.message || err));
     }
   });
-  input.click();
+
+  document.getElementById('recordConfirmBtn').addEventListener('click', async () => {
+    if (!_recBlob) return;
+    if (_recSeconds < 5) {
+      toast('录音太短，请录制至少 5 秒');
+      return;
+    }
+    try { await _doUploadAudioData(_recBlob); } catch (err) { toast(err.message); }
+  });
+
+  document.getElementById('recordRetryBtn').addEventListener('click', () => {
+    _resetRecordStep();
+  });
+
+  document.getElementById('cloneAudioBack').addEventListener('click', () => {
+    _resetRecordStep();
+    document.getElementById('cloneAudioStep1').hidden = false;
+    document.getElementById('cloneAudioStep2').hidden = true;
+  });
+
+  document.getElementById('cloneAudioCancel').addEventListener('click', () => {
+    _resetRecordStep();
+    document.getElementById('cloneAudioModal').hidden = true;
+  });
+
+  document.getElementById('cloneAudioModal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) {
+      _resetRecordStep();
+      e.currentTarget.hidden = true;
+    }
+  });
 }
 
 function renderVoiceCards() {
