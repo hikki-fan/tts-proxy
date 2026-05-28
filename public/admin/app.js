@@ -129,6 +129,18 @@ function lightenHex(hex, pct) {
   b=Math.min(255,Math.round(b+(255-b)*pct/100));
   return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
 }
+function rgbToHex(str) {
+  const m = str.match(/\d+/g);
+  if (!m || m.length < 3) return null;
+  return '#' + m.slice(0,3).map(n => parseInt(n).toString(16).padStart(2,'0')).join('');
+}
+function darkenHex(hex, pct) {
+  let r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  r=Math.max(0,Math.round(r*(1-pct/100)));
+  g=Math.max(0,Math.round(g*(1-pct/100)));
+  b=Math.max(0,Math.round(b*(1-pct/100)));
+  return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+}
 
 function applyCustomAccent(hex) {
   const root = document.documentElement;
@@ -143,20 +155,52 @@ function applyCustomAccent(hex) {
   document.querySelectorAll('.theme-swatch').forEach(b => b.classList.remove('active'));
 }
 
+function applyCustomBg(hex) {
+  const root = document.documentElement;
+  root.style.setProperty('--bg', hex);
+  root.style.setProperty('--bg2', darkenHex(hex, 4));
+  try { localStorage.setItem('mimo_custom_bg', hex); } catch {}
+}
+
+function clearCustomBg() {
+  const root = document.documentElement;
+  root.style.removeProperty('--bg');
+  root.style.removeProperty('--bg2');
+  try { localStorage.removeItem('mimo_custom_bg'); } catch {}
+  const el = document.getElementById('customBgColor');
+  if (el) el.value = getComputedStyle(root).getPropertyValue('--bg').trim() || '#edf0f7';
+}
+
 function applyTheme(theme) {
+  const root = document.documentElement;
+  const savedBg = localStorage.getItem('mimo_custom_bg');
+
   if (theme === 'custom') {
     const hex = localStorage.getItem('mimo_custom_accent') || '#4f6ef2';
     const colorInput = document.getElementById('customAccentColor');
     if (colorInput) colorInput.value = hex;
     applyCustomAccent(hex);
-    return;
+  } else {
+    ['--accent','--accent-2','--accent-grad','--accent-soft','--shadow-accent'].forEach(v => root.style.removeProperty(v));
+    root.dataset.theme = theme || '';
+    document.querySelectorAll('.theme-swatch').forEach(b => b.classList.toggle('active', (b.dataset.theme || '') === (theme || '')));
+    try { localStorage.setItem('mimo_theme', theme || ''); } catch {}
   }
-  // Clear any inline custom vars
-  const root = document.documentElement;
-  ['--accent','--accent-2','--accent-grad','--accent-soft','--shadow-accent'].forEach(v => root.style.removeProperty(v));
-  root.dataset.theme = theme || '';
-  document.querySelectorAll('.theme-swatch').forEach(b => b.classList.toggle('active', (b.dataset.theme || '') === (theme || '')));
-  try { localStorage.setItem('mimo_theme', theme || ''); } catch {}
+
+  // 恢复自定义背景色（叠加在任何主题上）
+  if (savedBg) {
+    applyCustomBg(savedBg);
+    const bgInput = document.getElementById('customBgColor');
+    if (bgInput) bgInput.value = savedBg;
+  } else {
+    root.style.removeProperty('--bg');
+    root.style.removeProperty('--bg2');
+    // 同步 picker 显示当前主题的背景色
+    requestAnimationFrame(() => {
+      const el = document.getElementById('customBgColor');
+      if (el) el.value = rgbToHex(getComputedStyle(root).getPropertyValue('--bg').trim()) || '#edf0f7';
+    });
+  }
 }
 
 function toggleSidebar(forceExpand, silent) {
@@ -264,6 +308,7 @@ function bindEvents() {
   document.querySelectorAll('.theme-swatch').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
+      clearCustomBg();
       const theme = btn.dataset.theme || '';
       applyTheme(theme);
       document.getElementById('themeMenu').hidden = true;
@@ -292,6 +337,9 @@ function bindEvents() {
   // 自定义颜色选择器
   document.getElementById('customAccentColor').addEventListener('input', (e) => {
     applyCustomAccent(e.target.value);
+  });
+  document.getElementById('customBgColor').addEventListener('input', (e) => {
+    applyCustomBg(e.target.value);
   });
 
   // 关于弹窗
