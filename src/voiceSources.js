@@ -90,8 +90,69 @@ function makeImportUrl(req, config, path = '/api/reader/tts-configs.json') {
   return `legado://import/httpTTS?src=${encodeURIComponent(`${origin}${path}`)}`;
 }
 
+// ─── V2: tts-importer 风格，POST body 内嵌在 URL 里 ──────────────────────────
+
+function makeVoiceSourceV2(origin, voice, options, id) {
+  const provider = voice.provider === 'gemini' ? 'gemini' : 'mimo';
+  const format = provider === 'gemini' ? 'wav' : (options.format || 'mp3');
+  const contentType = format === 'wav' ? 'audio/wav' : format === 'aac' ? 'audio/aac' : 'audio/mpeg';
+  const model = provider === 'gemini'
+    ? (voice.model || options.geminiModel || '')
+    : (voice.model || options.model || '');
+
+  const bodyObj = {
+    text: '{{speakText}}',
+    voiceId: voice.id,
+    voice: voice.voice,
+    provider,
+    model,
+    speed: '{{speakSpeed}}',
+    format
+  };
+  if (voice.voiceDescription) bodyObj.voiceDescription = voice.voiceDescription;
+
+  const headers = { 'Content-Type': 'application/json' };
+  if (options.accessToken) headers['x-access-token'] = options.accessToken;
+
+  const urlConfig = { method: 'POST', body: JSON.stringify(bodyObj), headers };
+
+  return {
+    concurrentRate: '0',
+    contentType,
+    header: JSON.stringify(headers),
+    id,
+    loginCheckJs: '',
+    loginUi: '',
+    loginUrl: '',
+    name: voice.name,
+    url: `${origin}/api/tts,${JSON.stringify(urlConfig)}`
+  };
+}
+
+function makeVoiceSourcesV2(req, config, options = {}) {
+  const origin = getOrigin(req, config.publicBaseUrl);
+  const voices = config.voices
+    .filter(v => v.inSubscription !== false)
+    .sort((a, b) => a.order - b.order);
+
+  let idCounter = Math.floor(Date.now() / 1000) * 1000;
+  return voices.map((voice) => makeVoiceSourceV2(origin, voice, {
+    accessToken: config.accessToken,
+    format: options.format || config.defaultFormat,
+    geminiModel: options.geminiModel || config.geminiModel,
+    model: options.model || config.mimoModel
+  }, idCounter++));
+}
+
+function makeImportUrlV2(req, config) {
+  const origin = getOrigin(req, config.publicBaseUrl);
+  return `legado://import/httpTTS?src=${encodeURIComponent(`${origin}/api/reader/tts-configs-v2.json`)}`;
+}
+
 module.exports = {
   getOrigin,
   makeVoiceSources,
-  makeImportUrl
+  makeVoiceSourcesV2,
+  makeImportUrl,
+  makeImportUrlV2
 };

@@ -2,7 +2,6 @@ const state = {
   config: null,
   voices: [],
   models: [],
-  sourceJson: '',
   selectedLang: 'zh',
   selectedMode: 'standard',
   selectedModel: 'mimo-v2.5-tts',
@@ -361,10 +360,6 @@ function bindEvents() {
   $('#addMimoVoiceBtn').addEventListener('click', () => addMimoVoiceRow());
   $('#saveMimoVoicesBtn').addEventListener('click', saveVoices);
   $('#saveDesignVoiceBtn').addEventListener('click', saveDesignVoice);
-  $('#reloadSourceBtn').addEventListener('click', loadSourcePreview);
-  $('#legacyToggle').addEventListener('change', loadSourcePreview);
-  $('#copySourceJsonBtn').addEventListener('click', () => copyText(state.sourceJson));
-  $('#downloadSourceBtn').addEventListener('click', downloadSourceJson);
 
   // QR 按钮（事件委托）— 切换内嵌二维码显示/隐藏
   document.body.addEventListener('click', (e) => {
@@ -410,7 +405,6 @@ function bindEvents() {
     if (model?.mode) state.selectedMode = model.mode;
     renderModeCards();
     renderModeFields();
-    loadSourcePreview();
   });
   $('#voiceDescription').addEventListener('input', () => {
     if (state.selectedMode === 'design') $('#testState').textContent = '待测试';
@@ -555,7 +549,6 @@ async function loadConfig(notify = false) {
     renderGeminiVoiceCards();
     renderVoices(data.voices);
     renderSubscriptionVoices(data.voices);
-    await loadSourcePreview();
     await loadStats();
     if (state.activeTab === 'cache') await loadCacheDetail();
 
@@ -984,9 +977,9 @@ function renderConfig(data) {
   $('#sourceUrlPublicHint').hidden = Boolean(rawPub);
   renderInlineQr(rawPub, 'qrSourceUrlPublic');
 
-  $('#legacySourceUrl').value = (data.endpoints.legacyVoiceSources || '')
-    .replace(/(\/api\/reader\/tts-configs)(\.json)?(\?|$)/, '$1.json$3');
-  $('#importUrl').value = data.endpoints.importUrl || '';
+  const rawPubV2 = data.endpoints.voiceSourcesV2 || '';
+  $('#sourceUrlPublicV2').value = rawPubV2;
+  renderInlineQr(rawPubV2, 'qrSourceUrlPublicV2');
   $('#testFormat').value = data.service.defaultFormat || 'mp3';
 
   setStatus($('#mimoStatus'), data.service.mimoConfigured ? 'MiMo 已配置' : 'MiMo 未配置', data.service.mimoConfigured);
@@ -1120,7 +1113,6 @@ function selectMode(mode) {
   renderModeFields();
   // 克隆模式自动切到克隆音色面板，其他模式切到默认音色面板
   switchVoiceTab(mode === 'clone' ? 'clone' : 'preset');
-  loadSourcePreview();
 }
 
 function uniqueModes(models) {
@@ -1200,7 +1192,6 @@ function makeVoiceCard(voice, isClone) {
     });
     updateSelectedVoiceField();
     updateVoiceSelectedBars();
-    loadSourcePreview();
   });
   return card;
 }
@@ -1580,7 +1571,6 @@ async function saveDesignVoice() {
   }
   renderVoiceOptions();
   renderVoices(state.voices);
-  await loadSourcePreview();
   toast('新音色已保存到订阅源');
 }
 
@@ -1674,18 +1664,6 @@ function moveRow(row, direction) {
   });
 }
 
-async function loadSourcePreview() {
-  const legacy = $('#legacyToggle').checked;
-  const params = new URLSearchParams();
-  if (legacy) params.set('legacy', '1');
-  const query = params.toString();
-  const url = `/api/reader/tts-configs${query ? `?${query}` : ''}`;
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`订阅预览加载失败: HTTP ${response.status}`);
-  const json = await response.json();
-  state.sourceJson = JSON.stringify(json, null, 2);
-  $('#sourcePreview').value = state.sourceJson;
-}
 
 async function clearCache() {
   const result = await adminJson('/api/admin/cache/clear', { method: 'POST' });
@@ -2134,26 +2112,6 @@ function downloadQrImage() {
 
 /* ─── Subscription Download ─────────────────────────────────────────────── */
 
-async function downloadSourceJson() {
-  try {
-    const legacy = $('#legacyToggle')?.checked;
-    const url = `/api/reader/tts-configs${legacy ? '?legacy=1' : ''}`;
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const json = await response.json();
-    const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `mimo-tts-sources${legacy ? '-legacy' : ''}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(a.href);
-    toast('订阅源 JSON 已下载');
-  } catch (err) {
-    toast(err.message);
-  }
-}
 
 function escapeHtml(value) {
   return String(value)

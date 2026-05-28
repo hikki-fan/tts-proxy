@@ -1,6 +1,6 @@
 {
   "name": "mimo-tts-http-proxy",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "description": "Dockerized MiMo TTS HTTP proxy and Legado/Gedoor voice source generator.",
   "main": "src/index.js",
   "type": "commonjs",

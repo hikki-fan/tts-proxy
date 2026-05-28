@@ -128,6 +128,7 @@ input, select, textarea {
   border-radius: var(--radius-xs);
   background: var(--input-bg);
   color: var(--text);
+  color-scheme: inherit;
   outline: none;
   font-size: 13px;
   box-shadow: var(--shadow-inset);

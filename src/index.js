@@ -11,7 +11,7 @@ const {
   contentTypeForFormat,
   normalizeSpeed
 } = require('./text');
-const { makeVoiceSources, makeImportUrl } = require('./voiceSources');
+const { makeVoiceSources, makeVoiceSourcesV2, makeImportUrl, makeImportUrlV2 } = require('./voiceSources');
 const logger = require('./logger');
 const { DEFAULT_SYSTEM_PROMPT, DEFAULT_USER_TEMPLATE } = require('./emotionAnalysis');
 
@@ -118,6 +118,17 @@ app.get('/api/reader/tts-configs.json', handleTtsConfigs);
 app.get('/api/reader/tts-config', handleTtsConfig);
 app.get('/api/reader/tts-config.json', handleTtsConfig);
 
+function handleTtsConfigsV2(req, res) {
+  const sources = makeVoiceSourcesV2(req, config, {
+    format: normalizeFormat(req.query.audioFormat, config.defaultFormat),
+    model: normalizeModel(req.query.model)
+  });
+  res.json(sources);
+}
+
+app.get('/api/reader/tts-configs-v2', handleTtsConfigsV2);
+app.get('/api/reader/tts-configs-v2.json', handleTtsConfigsV2);
+
 app.get('/api/voices', (req, res) => {
   res.json({
     voices: config.voices.map(safeVoice),
@@ -130,7 +141,9 @@ app.get('/api/voices', (req, res) => {
 app.get('/api/import-url', (req, res) => {
   res.json({
     url: makeImportUrl(req, config),
-    source: makeAbsoluteUrl(req, '/api/reader/tts-configs')
+    source: makeAbsoluteUrl(req, '/api/reader/tts-configs'),
+    urlV2: makeImportUrlV2(req, config),
+    sourceV2: makeAbsoluteUrl(req, '/api/reader/tts-configs-v2.json')
   });
 });
 
@@ -162,6 +175,8 @@ app.get('/api/admin/config', assertAdmin, async (req, res, next) => {
         voiceSourcesPublic: `${baseUrl}/api/reader/tts-configs.json`,
         legacyVoiceSources: `${baseUrl}/api/reader/tts-configs.json?legacy=1`,
         importUrl: makeImportUrl(req, config),
+        importUrlV2: makeImportUrlV2(req, config),
+        voiceSourcesV2: `${baseUrl}/api/reader/tts-configs-v2.json`,
         health: `${baseUrl}/health`
       },
       models: config.models,
@@ -363,6 +378,15 @@ app.get('/api/tts', async (req, res, next) => {
   try {
     assertAccess(req);
     await synthesizeAndSend(req.query, res, { log: config.logEnabled, emotion: config.emotionEnabled, clientId: getClientId(req) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/tts', async (req, res, next) => {
+  try {
+    assertAccess(req);
+    await synthesizeAndSend(req.body, res, { log: config.logEnabled, emotion: config.emotionEnabled, clientId: getClientId(req) });
   } catch (error) {
     next(error);
   }
