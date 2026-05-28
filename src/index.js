@@ -334,9 +334,9 @@ app.post('/api/admin/clone-audio/:voiceId', assertAdmin, async (req, res, next) 
     const { voiceId } = req.params;
     const { audioData } = req.body || {};
 
-    const match = String(audioData || '').match(/^data:(audio\/(?:mpeg|mp3|wav|mp4|x-m4a|aac|ogg|webm));base64,(.+)$/s);
+    const match = String(audioData || '').match(/^data:(audio\/(?:mpeg|mp3|wav));base64,(.+)$/s);
     if (!match) {
-      const err = new Error('无效的音频数据，须为 data URI 格式（支持 WAV / MP3 / M4A / AAC）');
+      const err = new Error('无效的音频数据，仅支持 MP3 / WAV，且须为 data URI 格式');
       err.statusCode = 400;
       throw err;
     }

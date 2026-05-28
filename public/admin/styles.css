@@ -833,6 +833,7 @@ h4 { font-size: 13px; font-weight: 600; }
 .voice-cards { display: flex; gap: 10px; min-width: max-content; }
 
 .voice-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -898,6 +899,26 @@ h4 { font-size: 13px; font-weight: 600; }
 
 .clone-audio-badge.ready  { background: var(--ok);   color: #fff; }
 .clone-audio-badge.missing{ background: var(--warn);  color: #fff; }
+
+.clone-delete-btn {
+  position: absolute;
+  top: -6px; left: -6px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--danger);
+  color: #fff;
+  border: 2px solid var(--panel);
+  font-size: 13px;
+  line-height: 1;
+  padding: 0;
+  min-height: unset;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 2;
+}
+.voice-card:hover .clone-delete-btn { opacity: 1; }
+.clone-delete-btn:hover { background: #b91c1c; transform: none; box-shadow: none; }
 
 .clone-upload-btn {
   font-size: 10px;

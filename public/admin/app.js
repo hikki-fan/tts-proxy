@@ -1211,6 +1211,7 @@ function makeVoiceCard(voice, isClone) {
     : '';
 
   card.innerHTML = `
+    ${isClone ? `<button type="button" class="clone-delete-btn" title="删除音色" aria-label="删除">×</button>` : ''}
     <div class="voice-avatar-wrap">${cloneBadge}<div class="voice-avatar" style="background:${color}">${escapeHtml(initial)}</div></div>
     <div class="voice-card-name" title="${escapeAttr(voice.name)}">${escapeHtml(voice.name)}</div>
     <div class="voice-card-lang">${escapeHtml(langLabel)}</div>
@@ -1221,6 +1222,17 @@ function makeVoiceCard(voice, isClone) {
     card.querySelector('.clone-upload-btn').addEventListener('click', (e) => {
       e.stopPropagation();
       uploadCloneAudio(voice.id);
+    });
+    card.querySelector('.clone-delete-btn').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (!confirm(`确认删除克隆音色「${voice.name}」？`)) return;
+      const updated = state.voices.filter(v => v.id !== voice.id);
+      await adminJson('/api/admin/voices', { method: 'PUT', body: JSON.stringify({ voices: updated }) });
+      state.voices = updated;
+      if (state.selectedVoiceId === voice.id) state.selectedVoiceId = '';
+      renderCloneVoiceCards();
+      renderVoiceOptions();
+      toast(`已删除「${voice.name}」`);
     });
   }
 
