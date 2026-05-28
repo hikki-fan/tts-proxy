@@ -542,11 +542,7 @@ function bindEvents() {
   document.getElementById('cloneAddSaveBtn').addEventListener('click', saveCloneVoice);
   document.getElementById('cloneAddCancelBtn').addEventListener('click', hideCloneAddForm);
   document.getElementById('cloneFilePick').addEventListener('click', () => {
-    document.getElementById('cloneAudioInput').click();
-  });
-  document.getElementById('cloneAudioInput').addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    document.getElementById('cloneFileName').textContent = file ? file.name : '点击选择音频文件（MP3 / WAV，≤10MB）';
+    showCloneAudioModal(null); // pick mode: no voiceId
   });
 
   // Stats
@@ -1331,6 +1327,7 @@ function uploadCloneAudio(voiceId) {
 // ─── 克隆音频 Modal ───────────────────────────────────────────────────────────
 
 let _cloneVoiceId = null;
+let _pendingAudioData = null; // pick mode: stores data URL before voice is created
 let _mediaRecorder = null;
 let _recChunks = [];
 let _recTimerId = null;
@@ -1367,6 +1364,14 @@ function _stopRecording() {
 }
 
 async function _doUploadAudioData(dataUrl) {
+  if (!_cloneVoiceId) {
+    // pick mode: store for saveCloneVoice to use
+    _pendingAudioData = dataUrl;
+    const label = dataUrl.startsWith('data:audio/wav') ? '已录制音频 (WAV)' : '已选择音频文件';
+    document.getElementById('cloneFileName').textContent = label;
+    document.getElementById('cloneAudioModal').hidden = true;
+    return;
+  }
   toast('上传中…');
   await adminJson(`/api/admin/clone-audio/${encodeURIComponent(_cloneVoiceId)}`, {
     method: 'POST',
@@ -1553,31 +1558,22 @@ function hideCloneAddForm() {
   const form = document.getElementById('cloneAddForm');
   if (form) form.hidden = true;
   const nameEl = document.getElementById('cloneAddName');
-  const fileEl = document.getElementById('cloneAudioInput');
   const labelEl = document.getElementById('cloneFileName');
   if (nameEl) nameEl.value = '';
-  if (fileEl) fileEl.value = '';
-  if (labelEl) labelEl.textContent = '点击选择音频文件（MP3 / WAV，≤10MB）';
+  if (labelEl) labelEl.textContent = '点击选择或录制音频（MP3 / WAV，≤10MB）';
+  _pendingAudioData = null;
 }
 
 async function saveCloneVoice() {
   const name = document.getElementById('cloneAddName').value.trim();
   const gender = document.getElementById('cloneAddGender').value;
-  const fileInput = document.getElementById('cloneAudioInput');
-  const file = fileInput?.files[0];
 
   if (!name) { toast('请填写音色名称'); return; }
-  if (!file) { toast('请选择音频文件'); return; }
-  if (file.size > 10 * 1024 * 1024) { toast('文件不能超过 10MB'); return; }
+  if (!_pendingAudioData) { toast('请选择或录制音频'); return; }
 
   toast('保存中…');
   try {
-    const base64 = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
+    const base64 = _pendingAudioData;
 
     const maxOrder = Math.max(0, ...state.voices.map(v => Number(v.order) || 0)) + 10;
     const newId = `clone-${Date.now().toString(36)}`;
