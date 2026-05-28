@@ -1039,9 +1039,6 @@ function renderConfig(data) {
   $('#baseUrl').textContent = data.service.baseUrl;
   $('#cacheCount').textContent = data.cache.count || 0;
   $('#cacheBytes').textContent = formatBytes(data.cache.bytes || 0);
-  $('#sourceUrlLocal').value = data.endpoints.voiceSourcesLocal
-    || `http://127.0.0.1:${data.service.port}/api/reader/tts-configs.json`;
-
   const rawPub = data.endpoints.voiceSourcesPublic
     || (data.endpoints.voiceSources
       ? data.endpoints.voiceSources.replace(/(\/api\/reader\/tts-configs)(\.json)?$/, '$1.json')
