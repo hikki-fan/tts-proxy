@@ -496,6 +496,12 @@ async function synthesizeAndSend(params, res, opts = {}) {
   } : null;
 
   // 克隆模型：读取音频样本文件并 base64 编码后作为 voice 传入
+  if (getModelMode(model) === 'clone' && !voiceConfig?.cloneAudioFile) {
+    const error = new Error('声音克隆音色需要先上传音频样本才能使用');
+    error.statusCode = 400;
+    throw error;
+  }
+
   let cloneAudioData = null;
   if (getModelMode(model) === 'clone' && voiceConfig?.cloneAudioFile) {
     try {
