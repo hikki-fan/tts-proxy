@@ -639,24 +639,26 @@ function makeDesignVoice(body) {
   const name = String(body.name || '').trim();
   const voiceDescription = decodeMaybeEncoded(body.voiceDescription);
   const model = normalizeModel(body.model || 'mimo-v2.5-tts-voicedesign');
+  const mode = getModelMode(model);
 
   if (!name) {
     const error = new Error('新音色名称不能为空');
     error.statusCode = 400;
     throw error;
   }
-  if (getModelMode(model) !== 'design') {
-    const error = new Error('保存声音设计音色时需要选择声音设计模型');
+  if (mode !== 'design' && mode !== 'clone') {
+    const error = new Error('仅支持声音设计或声音克隆模型');
     error.statusCode = 400;
     throw error;
   }
-  if (!voiceDescription) {
+  if (mode === 'design' && !voiceDescription) {
     const error = new Error('声音设计描述不能为空');
     error.statusCode = 400;
     throw error;
   }
 
-  const id = uniqueVoiceId(body.id || makeSlug(`design-${name}`));
+  const isClone = mode === 'clone';
+  const id = uniqueVoiceId(body.id || makeSlug(`${isClone ? 'clone' : 'design'}-${name}`));
   const order = Math.max(0, ...config.voices.map((voice) => Number(voice.order) || 0)) + 10;
   return {
     id,
@@ -668,8 +670,8 @@ function makeDesignVoice(body) {
     language: String(body.language || '').trim() || 'zh',
     gender: String(body.gender || '').trim() || 'female',
     description: String(body.description || voiceDescription).trim(),
-    badge: String(body.badge || '声音设计').trim(),
-    color: String(body.color || '#ff6b6b').trim(),
+    badge: String(body.badge || (isClone ? '声音克隆' : '声音设计')).trim(),
+    color: String(body.color || (isClone ? '#7c3aed' : '#ff6b6b')).trim(),
     order
   };
 }

@@ -1584,10 +1584,11 @@ async function saveSettings(event) {
 
 async function saveDesignVoice() {
   const selected = getSelectedVoiceEntry();
+  const isClone = state.selectedMode === 'clone';
   const voiceDescription = $('#voiceDescription').value.trim();
-  const name = $('#designVoiceName').value.trim() || voiceDescription.slice(0, 12) || '声音设计音色';
+  const name = $('#designVoiceName').value.trim() || (isClone ? '克隆音色' : (voiceDescription.slice(0, 12) || '声音设计音色'));
 
-  if (!voiceDescription) {
+  if (!isClone && !voiceDescription) {
     toast('请先填写声音设计描述');
     $('#voiceDescription').focus();
     return;
