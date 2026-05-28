@@ -329,6 +329,28 @@ app.post('/api/admin/cache/delete', assertAdmin, async (req, res, next) => {
   }
 });
 
+app.get('/api/admin/cache/download/:key', assertAdmin, async (req, res, next) => {
+  const { createReadStream } = require('node:fs');
+  try {
+    const { key } = req.params;
+    const entries = await cache.list();
+    const entry = entries.find(e => e.key === key);
+    if (!entry) return res.status(404).json({ error: 'Not found' });
+    const filePath = cache.filePath(key, entry.format);
+    const { stat } = await require('node:fs/promises').stat(filePath).then(s => ({ stat: s })).catch(() => ({ stat: null }));
+    if (!stat) return res.status(404).json({ error: 'File not found' });
+    const mimeMap = { mp3: 'audio/mpeg', wav: 'audio/wav', aac: 'audio/aac', pcm16: 'audio/pcm', ogg: 'audio/ogg' };
+    const mime = mimeMap[entry.format] || 'application/octet-stream';
+    const safeName = (entry.voice || 'audio').replace(/[^\w一-龥.-]/g, '_');
+    res.setHeader('Content-Type', mime);
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(safeName)}.${entry.format}`);
+    res.setHeader('Content-Length', stat.size);
+    createReadStream(filePath).pipe(res);
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post('/api/admin/test-tts', assertAdmin, async (req, res, next) => {
   try {
     await synthesizeAndSend(req.body || {}, res, { emotion: config.emotionEnabled, log: config.logEnabled, clientId: getClientId(req) });

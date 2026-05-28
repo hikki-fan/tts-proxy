@@ -1361,6 +1361,30 @@ td:last-child, th:last-child { width: 120px; }
 .cache-detail-table tbody tr:hover td { background: var(--bg); }
 .cache-detail-table tbody tr.selected:hover td { background: var(--accent-soft); }
 .cache-detail-empty { padding: 28px; text-align: center; color: var(--muted); font-size: 13px; }
+.td-dl { width: 36px; text-align: center; }
+.cache-dl-btn { opacity: 0.5; transition: opacity 0.15s; }
+.cache-detail-table tbody tr:hover .cache-dl-btn { opacity: 1; }
+.cache-pagination {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 2px 2px;
+  font-size: 12px;
+  color: var(--muted);
+  justify-content: flex-end;
+}
+.cache-pagination .icon-btn { width: 24px; height: 24px; font-size: 14px; line-height: 1; padding: 0; }
+.cache-pagination select {
+  width: 5rem;
+  font-size: 11px;
+  padding: 2px 4px;
+  height: 24px;
+  border-radius: var(--radius-xs);
+  border: 1.5px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
 
 /* ─── Source Preview ──────────────────────────────────────────────────────── */
 

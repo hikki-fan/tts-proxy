@@ -16,7 +16,10 @@ const state = {
   voiceTab: 'preset',
   geminiLang: 'zh',
   geminiVoiceId: '',
-  geminiVoice: ''
+  geminiVoice: '',
+  cacheEntries: [],
+  cachePage: 1,
+  cachePageSize: 20
 };
 
 // MiMo v2.5 预设音色列表
@@ -37,9 +40,9 @@ const PRESET_VOICES = [
 function buildVoiceOptions(selected) {
   const presets = PRESET_VOICES;
   const presetValues = new Set(presets.map(v => v.value));
-  // 补充 state.voices 中不在预设里的 voice 值
+  // 补充 state.voices 中不在预设里的 voice 值（仅 MiMo 音色）
   const extras = [...new Set(
-    state.voices.map(v => v.voice).filter(v => v && v !== 'clone' && !presetValues.has(v))
+    state.voices.filter(v => v.provider !== 'gemini').map(v => v.voice).filter(v => v && v !== 'clone' && !presetValues.has(v))
   )];
   const all = [
     ...presets,
@@ -344,6 +347,7 @@ function bindEvents() {
   $('#clearCacheBtn').addEventListener('click', clearCache);
   $('#cacheDetailRefreshBtn').addEventListener('click', loadCacheDetail);
   $('#cacheDetailDeleteBtn').addEventListener('click', deleteCacheSelected);
+  $('#cacheDownloadBtn')?.addEventListener('click', downloadCacheList);
   document.getElementById('cacheDetailSelectAll')?.addEventListener('change', (e) => {
     document.querySelectorAll('#cacheDetailRows .cache-row-check').forEach(cb => {
       cb.checked = e.target.checked;
@@ -989,8 +993,6 @@ function renderConfig(data) {
   setStatus($('#cacheStatus'), data.cache.enabled ? `缓存 ${data.cache.count}` : '缓存关闭', data.cache.enabled);
   const geminiStatus = $('#geminiStatus');
   if (geminiStatus) setStatus(geminiStatus, data.service.geminiConfigured ? 'Gemini 已配置' : 'Gemini 未配置', data.service.geminiConfigured);
-  const geminiTestStatus = $('#geminiTestStatus');
-  if (geminiTestStatus) setStatus(geminiTestStatus, data.service.geminiConfigured ? 'Gemini 已配置' : 'Gemini 未配置', data.service.geminiConfigured);
   updateSelectedVoiceField();
 }
 
@@ -1236,7 +1238,7 @@ function renderVoiceCards() {
   const container = document.getElementById('voiceCards');
   if (!container) return;
   const voices = state.voices
-    .filter(v => !String(v.model || '').includes('voiceclone') && v.language === state.selectedLang)
+    .filter(v => v.provider !== 'gemini' && !String(v.model || '').includes('voiceclone') && v.language === state.selectedLang)
     .sort((a, b) => (a.order || 0) - (b.order || 0));
   container.innerHTML = '';
   voices.forEach(v => container.appendChild(makeVoiceCard(v, false)));
@@ -1698,7 +1700,9 @@ async function loadCacheDetail() {
   tbody.innerHTML = '<tr><td colspan="8" class="cache-detail-empty">加载中…</td></tr>';
   try {
     const data = await adminJson('/api/admin/cache/list');
-    renderCacheDetail(data.entries || []);
+    state.cacheEntries = data.entries || [];
+    state.cachePage = 1;
+    renderCacheDetail(state.cacheEntries);
   } catch {
     tbody.innerHTML = '<tr><td colspan="8" class="cache-detail-empty">加载失败</td></tr>';
   }
@@ -1710,12 +1714,20 @@ function renderCacheDetail(entries) {
   if (!tbody) return;
 
   if (!entries.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="cache-detail-empty">暂无缓存</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="cache-detail-empty">暂无缓存</td></tr>';
+    renderCachePagination(0);
     updateCacheDetailSelCount();
     return;
   }
 
-  tbody.innerHTML = entries.map(e => {
+  const total = entries.length;
+  const pageSize = state.cachePageSize;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  if (state.cachePage > totalPages) state.cachePage = totalPages;
+  const start = (state.cachePage - 1) * pageSize;
+  const pageEntries = entries.slice(start, start + pageSize);
+
+  tbody.innerHTML = pageEntries.map(e => {
     const time = e.cachedAt ? new Date(e.cachedAt).toLocaleString('zh-CN', { hour12: false }) : (e.mtimeMs ? new Date(e.mtimeMs).toLocaleString('zh-CN', { hour12: false }) : '—');
     const size = formatBytes(e.size || 0);
     const model = escapeHtml(e.model || e.provider || '—');
@@ -1723,7 +1735,7 @@ function renderCacheDetail(entries) {
     const fmt = escapeHtml(e.format || '—');
     const chars = e.chars != null ? e.chars : '—';
     const preview = escapeHtml(e.textPreview || '—');
-    return `<tr data-key="${escapeAttr(e.key)}">
+    return `<tr data-key="${escapeAttr(e.key)}" data-format="${escapeAttr(e.format || '')}" data-voice="${escapeAttr(e.voice || '')}">
       <td class="th-check"><label class="check"><input type="checkbox" class="cache-row-check"></label></td>
       <td>${model}</td>
       <td>${voice}</td>
@@ -1732,6 +1744,7 @@ function renderCacheDetail(entries) {
       <td>${size}</td>
       <td>${time}</td>
       <td class="td-preview" title="${escapeAttr(e.textPreview || '')}">${preview}</td>
+      <td class="td-dl"><button type="button" class="icon-btn cache-dl-btn" title="下载音频">⬇</button></td>
     </tr>`;
   }).join('');
 
@@ -1742,8 +1755,98 @@ function renderCacheDetail(entries) {
     });
   });
 
+  tbody.querySelectorAll('.cache-dl-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const row = btn.closest('tr');
+      downloadCacheAudio(row.dataset.key, row.dataset.format, row.dataset.voice);
+    });
+  });
+
   if (selAll) selAll.checked = false;
+  renderCachePagination(total);
   updateCacheDetailSelCount();
+}
+
+function renderCachePagination(total) {
+  const el = document.getElementById('cachePagination');
+  if (!el) return;
+  if (total === 0) { el.innerHTML = ''; return; }
+  const pageSize = state.cachePageSize;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const page = state.cachePage;
+  el.innerHTML = `
+    <span style="display: inline-block;width: 3rem">共 ${total} 条</span>
+    <button type="button" class="icon-btn" id="cachePrevBtn" ${page <= 1 ? 'disabled' : ''}>‹</button>
+    <span style="display: inline-block;width: 2rem">${page} / ${totalPages}</span>
+    <button type="button" class="icon-btn" id="cacheNextBtn" ${page >= totalPages ? 'disabled' : ''}>›</button>
+    <select id="cachePageSizeSelect">
+      <option value="20" ${pageSize === 20 ? 'selected' : ''}>20 条/页</option>
+      <option value="50" ${pageSize === 50 ? 'selected' : ''}>50 条/页</option>
+      <option value="100" ${pageSize === 100 ? 'selected' : ''}>100 条/页</option>
+    </select>
+  `;
+  el.querySelector('#cachePrevBtn').addEventListener('click', () => {
+    if (state.cachePage > 1) { state.cachePage--; renderCacheDetail(state.cacheEntries); }
+  });
+  el.querySelector('#cacheNextBtn').addEventListener('click', () => {
+    const tp = Math.ceil(state.cacheEntries.length / state.cachePageSize);
+    if (state.cachePage < tp) { state.cachePage++; renderCacheDetail(state.cacheEntries); }
+  });
+  el.querySelector('#cachePageSizeSelect').addEventListener('change', (e) => {
+    state.cachePageSize = Number(e.target.value);
+    state.cachePage = 1;
+    renderCacheDetail(state.cacheEntries);
+  });
+}
+
+async function downloadCacheAudio(key, format, voice) {
+  try {
+    const response = await fetch(`/api/admin/cache/download/${encodeURIComponent(key)}`, {
+      headers: adminHeaders()
+    });
+    if (!response.ok) {
+      const err = await safeJson(response);
+      throw new Error(err.error || `HTTP ${response.status}`);
+    }
+    const blob = await response.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${voice || key}.${format || 'mp3'}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+  } catch (err) {
+    toast(err.message);
+  }
+}
+
+function downloadCacheList() {
+  const entries = state.cacheEntries;
+  if (!entries.length) { toast('暂无缓存数据'); return; }
+  const headers = ['模型', '音色', '格式', '字符数', '大小(B)', '缓存时间', '内容预览', 'Key'];
+  const rows = entries.map(e => [
+    e.model || e.provider || '',
+    e.voice || '',
+    e.format || '',
+    e.chars != null ? e.chars : '',
+    e.size || 0,
+    e.cachedAt
+      ? new Date(e.cachedAt).toLocaleString('zh-CN', { hour12: false })
+      : (e.mtimeMs ? new Date(e.mtimeMs).toLocaleString('zh-CN', { hour12: false }) : ''),
+    e.textPreview || '',
+    e.key || ''
+  ].map(v => `"${String(v).replace(/"/g, '""')}"`));
+  const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `mimo-cache-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+  toast('缓存列表已下载');
 }
 
 function updateCacheDetailSelCount() {

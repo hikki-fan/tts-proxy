@@ -486,10 +486,6 @@
           <!-- Gemini 测试面板 -->
           <div id="studioGemini" class="studio-panel" hidden>
             <div class="gemini-test-wrap">
-              <div class="gemini-status-row">
-                <span id="geminiTestStatus" class="status">Gemini 未配置</span>
-                <span class="muted">使用全局配置的 Gemini 模型与 API Key</span>
-              </div>
               <div class="voice-block">
                 <div class="lang-row">
                   <div class="lang-tabs" role="tablist">
@@ -564,6 +560,7 @@
               <div class="toolbar">
                 <span id="cacheDetailSelCount" class="muted" style="font-size:12px"></span>
                 <button id="cacheDetailDeleteBtn" type="button" class="danger" disabled>删除选中</button>
+                <button id="cacheDownloadBtn" type="button">下载 CSV</button>
                 <button id="cacheDetailRefreshBtn" type="button">刷新</button>
               </div>
             </div>
@@ -579,11 +576,13 @@
                     <th>大小</th>
                     <th>缓存时间</th>
                     <th>内容预览</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody id="cacheDetailRows"></tbody>
               </table>
             </div>
+            <div id="cachePagination" class="cache-pagination"></div>
           </div>
         </section>
 
