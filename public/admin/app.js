@@ -219,9 +219,8 @@ function switchStudioTab(tab) {
 
 async function initPage() {
   try {
-    const { adminProtected } = await fetch('/api/admin/auth-status').then((r) => r.json());
-    const hasToken = Boolean(localStorage.getItem('mimo_admin_token'));
-    if (adminProtected && !hasToken) {
+    const { adminProtected, authenticated } = await fetch('/api/admin/auth-status').then((r) => r.json());
+    if (adminProtected && !authenticated) {
       showLoginOverlay();
       return;
     }
@@ -364,8 +363,8 @@ function bindEvents() {
       if (input) input.placeholder = isClearing ? '保存后将清除此 Token' : '留空不修改';
     });
   });
-  $('#logoutBtn').addEventListener('click', () => {
-    localStorage.removeItem('mimo_admin_token');
+  $('#logoutBtn').addEventListener('click', async () => {
+    await fetch('/api/admin/logout', { method: 'POST' });
     showLoginOverlay();
   });
 
@@ -374,13 +373,17 @@ function bindEvents() {
     const token = $('#loginToken').value.trim();
     if (!token) return;
     $('#loginError').hidden = true;
-    localStorage.setItem('mimo_admin_token', token);
     try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token })
+      });
+      if (!res.ok) throw new Error('invalid');
       await loadConfig(false);
       hideLoginOverlay();
       $('#loginToken').value = '';
-    } catch (err) {
-      localStorage.removeItem('mimo_admin_token');
+    } catch {
       $('#loginError').hidden = false;
     }
   });
@@ -598,8 +601,7 @@ async function loadConfig(notify = false) {
     const authWarning = document.getElementById('authWarning');
     if (authWarning) authWarning.hidden = data.service.adminProtected;
 
-    const hasToken = Boolean(localStorage.getItem('mimo_admin_token'));
-    $('#logoutBtn').hidden = !hasToken;
+    $('#logoutBtn').hidden = !data.service.adminProtected;
 
     if (notify) toast('已刷新');
   } catch (error) {
@@ -2045,10 +2047,7 @@ async function adminJson(url, options = {}) {
 }
 
 function adminHeaders(extra = {}) {
-  const headers = { ...extra };
-  const token = localStorage.getItem('mimo_admin_token');
-  if (token) headers['x-admin-token'] = token;
-  return headers;
+  return { ...extra };
 }
 
 async function safeJson(response) {

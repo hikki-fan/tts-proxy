@@ -1,5 +1,6 @@
 const express = require('express');
 const path = require('node:path');
+const crypto = require('node:crypto');
 
 const { config, saveVoices, saveSettings, getSettingsView } = require('./config');
 const { AudioCache, cacheKey } = require('./cache');
@@ -34,6 +35,34 @@ const gemini = new GeminiClient({
   timeoutMs: config.requestTimeoutMs
 });
 
+// ─── Session store ────────────────────────────────────────────────────────────
+const sessions = new Map(); // sessionId -> expiresAt
+const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+function createSession() {
+  const id = crypto.randomBytes(32).toString('hex');
+  sessions.set(id, Date.now() + SESSION_MAX_AGE_MS);
+  return id;
+}
+
+function isValidSession(id) {
+  if (!id) return false;
+  const exp = sessions.get(id);
+  if (!exp) return false;
+  if (Date.now() > exp) { sessions.delete(id); return false; }
+  return true;
+}
+
+function parseCookie(req, name) {
+  const header = req.headers.cookie || '';
+  for (const part of header.split(';')) {
+    const eq = part.indexOf('=');
+    if (eq < 0) continue;
+    if (part.slice(0, eq).trim() === name) return part.slice(eq + 1).trim();
+  }
+  return null;
+}
+
 app.set('trust proxy', true);
 app.use(express.json({ limit: '20mb' }));
 app.get('/admin', (req, res) => {
@@ -53,7 +82,34 @@ app.get('/health', (req, res) => {
 });
 
 app.get('/api/admin/auth-status', (req, res) => {
-  res.json({ adminProtected: Boolean(config.adminToken) });
+  const sessionId = parseCookie(req, 'mimo_session');
+  res.json({
+    adminProtected: Boolean(config.adminToken),
+    authenticated: !config.adminToken || isValidSession(sessionId)
+  });
+});
+
+app.post('/api/admin/login', (req, res) => {
+  if (!config.adminToken) return res.json({ ok: true });
+  const { token } = req.body || {};
+  if (token !== config.adminToken) {
+    return res.status(401).json({ error: '密码错误' });
+  }
+  const sessionId = createSession();
+  res.cookie('mimo_session', sessionId, {
+    httpOnly: true,
+    sameSite: 'strict',
+    maxAge: SESSION_MAX_AGE_MS,
+    path: '/'
+  });
+  res.json({ ok: true });
+});
+
+app.post('/api/admin/logout', (req, res) => {
+  const sessionId = parseCookie(req, 'mimo_session');
+  if (sessionId) sessions.delete(sessionId);
+  res.clearCookie('mimo_session', { path: '/' });
+  res.json({ ok: true });
 });
 
 const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
@@ -278,9 +334,9 @@ app.post('/api/admin/clone-audio/:voiceId', assertAdmin, async (req, res, next) 
     const { voiceId } = req.params;
     const { audioData } = req.body || {};
 
-    const match = String(audioData || '').match(/^data:(audio\/(?:mpeg|mp3|wav));base64,(.+)$/s);
+    const match = String(audioData || '').match(/^data:(audio\/(?:mpeg|mp3|wav|mp4|x-m4a|aac|ogg|webm));base64,(.+)$/s);
     if (!match) {
-      const err = new Error('无效的音频数据，仅支持 MP3 / WAV，且须为 data URI 格式');
+      const err = new Error('无效的音频数据，须为 data URI 格式（支持 WAV / MP3 / M4A / AAC）');
       err.statusCode = 400;
       throw err;
     }
@@ -421,11 +477,8 @@ function assertAccess(req) {
 
 function assertAdmin(req, res, next) {
   if (!config.adminToken) return next();
-
-  const token = req.get('x-admin-token') || req.query.adminToken;
-  if (token === config.adminToken) return next();
-
-  res.status(401).json({ error: 'Invalid admin token' });
+  if (isValidSession(parseCookie(req, 'mimo_session'))) return next();
+  res.status(401).json({ error: 'Unauthorized' });
 }
 
 async function synthesizeAndSend(params, res, opts = {}) {
