@@ -16,6 +16,7 @@ http://ip:3000/admin
 
 - 安卓阅读声音源订阅：`/api/reader/tts-configs-v2.json`
 - iOS读不舍手声音源：`/api/reader/tts-configs-v2.json`
+- 如果有其他阅读器支持了创建自定义的语音源，可以提 Issue 请求支持生成它们的语音源配置。
 - MiMo 标准 TTS、声音设计、声音克隆
 - Gemini Live Audio 音色支持
 - Web 管理后台：配置、试听、音色管理、订阅源预览
