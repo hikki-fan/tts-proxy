@@ -1387,6 +1387,26 @@ td:last-child, th:last-child { width: 120px; }
   cursor: pointer;
 }
 
+/* ─── Page Footer ─────────────────────────────────────────────────────────── */
+
+.page-footer {
+  text-align: center;
+  padding: 14px 0 18px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.page-footer a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.page-footer a:hover { color: var(--accent); }
+
 /* ─── Source Preview ──────────────────────────────────────────────────────── */
 
 .source-preview-wrap { margin-top: 18px; border-top: 1.5px solid var(--line); padding-top: 16px; }
