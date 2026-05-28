@@ -309,6 +309,38 @@ function bindEvents() {
     if (e.target === e.currentTarget) e.currentTarget.hidden = true;
   });
 
+  // 清空 API Key 按钮 + 二次确认
+  let _clearKeyTarget = null;
+  function showClearKeyConfirm(checkboxId, desc) {
+    _clearKeyTarget = checkboxId;
+    document.getElementById('clearKeyConfirmDesc').textContent = desc;
+    document.getElementById('clearKeyConfirmModal').hidden = false;
+  }
+  document.getElementById('clearMimoApiKeyBtn').addEventListener('click', () => {
+    showClearKeyConfirm('clearMimoApiKey', '清空后 MiMo TTS 将无法使用，需重新填写 API Key 并保存配置。');
+  });
+  document.getElementById('clearGeminiApiKeyBtn').addEventListener('click', () => {
+    showClearKeyConfirm('clearGeminiApiKey', '清空后 Gemini TTS 将无法使用，需重新填写 API Key 并保存配置。');
+  });
+  document.getElementById('clearKeyConfirmOk').addEventListener('click', () => {
+    if (_clearKeyTarget) {
+      document.getElementById(_clearKeyTarget).checked = true;
+      document.getElementById('clearKeyConfirmModal').hidden = true;
+      _clearKeyTarget = null;
+      document.getElementById('settingsForm').requestSubmit();
+    }
+  });
+  document.getElementById('clearKeyConfirmCancel').addEventListener('click', () => {
+    document.getElementById('clearKeyConfirmModal').hidden = true;
+    _clearKeyTarget = null;
+  });
+  document.getElementById('clearKeyConfirmModal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) {
+      e.currentTarget.hidden = true;
+      _clearKeyTarget = null;
+    }
+  });
+
   document.getElementById('mimoApiKeyHelpBtn').addEventListener('click', () => {
     document.getElementById('mimoKeyModal').hidden = false;
   });

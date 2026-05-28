@@ -218,9 +218,10 @@
                   <button type="button" id="mimoApiKeyHelpBtn" title="如何获取 API Key">获取</button>
                 </div>
               </label>
-              <label class="check setting-check">
-                <input id="clearMimoApiKey" type="checkbox"><span>清空 MiMo API Key</span>
-              </label>
+              <div class="clear-key-row">
+                <input id="clearMimoApiKey" type="checkbox" hidden>
+                <button type="button" id="clearMimoApiKeyBtn" class="danger-btn">清空 API Key</button>
+              </div>
               <label>
                 <span>MiMo Base URL</span>
                 <input id="settingsMimoBaseUrl" placeholder="https://api.xiaomimimo.com/v1">
@@ -237,9 +238,10 @@
                 <span>Gemini API Key</span>
                 <input id="settingsGeminiApiKey" type="password" autocomplete="off" placeholder="留空不修改">
               </label>
-              <label class="check setting-check">
-                <input id="clearGeminiApiKey" type="checkbox"><span>清空 Gemini API Key</span>
-              </label>
+              <div class="clear-key-row">
+                <input id="clearGeminiApiKey" type="checkbox" hidden>
+                <button type="button" id="clearGeminiApiKeyBtn" class="danger-btn">清空 API Key</button>
+              </div>
               <label>
                 <span>Gemini 模型</span>
                 <select id="settingsGeminiModel">
@@ -638,6 +640,21 @@
           <span>运行端口：<strong id="aboutPort">3000</strong></span>
         </div>
         <button type="button" id="closeAboutBtn" class="primary">关闭</button>
+      </div>
+    </div>
+
+    <!-- 清空 API Key 二次确认 -->
+    <div id="clearKeyConfirmModal" class="modal-overlay" hidden>
+      <div class="modal-card confirm-modal-card">
+        <div class="modal-icon danger-icon">
+          <svg viewBox="0 0 20 20" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" width="26" height="26"><path d="M10 3L2 17h16L10 3z"/><line x1="10" y1="10" x2="10" y2="13"/><circle cx="10" cy="15.5" r="0.5" fill="white" stroke="none"/></svg>
+        </div>
+        <h2>确认清空？</h2>
+        <p id="clearKeyConfirmDesc">清空后将无法使用该服务，需重新填写 API Key 并保存。</p>
+        <div class="confirm-actions">
+          <button type="button" id="clearKeyConfirmOk" class="danger-btn">确认清空</button>
+          <button type="button" id="clearKeyConfirmCancel">取消</button>
+        </div>
       </div>
     </div>
 

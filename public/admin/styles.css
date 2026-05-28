@@ -1807,6 +1807,33 @@ td:last-child, th:last-child { width: 120px; }
 
 .theme-custom-label:hover input[type="color"] { transform: scale(1.18); }
 
+/* ─── Danger Button ───────────────────────────────────────────────────────── */
+
+.danger-btn {
+  background: var(--danger);
+  color: #fff;
+  border: none;
+  box-shadow: 0 2px 8px rgba(220,38,38,.25);
+}
+.danger-btn:hover { background: #b91c1c; transform: translateY(-1px); }
+
+.danger-icon {
+  background: linear-gradient(135deg, #f87171, #dc2626);
+  box-shadow: 0 6px 20px rgba(220,38,38,.3);
+}
+
+.clear-key-row { display: flex; align-items: center; }
+
+.confirm-modal-card { width: min(360px, calc(100vw - 32px)); }
+
+.confirm-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  margin-top: 4px;
+}
+.confirm-actions button { flex: 1; }
+
 /* ─── Guide Steps Modal ───────────────────────────────────────────────────── */
 
 .mimo-key-modal-card {
