@@ -1822,7 +1822,7 @@ td:last-child, th:last-child { width: 120px; }
   box-shadow: 0 6px 20px rgba(220,38,38,.3);
 }
 
-.clear-key-row { display: flex; align-items: center; }
+.clear-key-row { display: flex; align-items: center; align-self: end; }
 
 .confirm-modal-card { width: min(360px, calc(100vw - 32px)); }
 
