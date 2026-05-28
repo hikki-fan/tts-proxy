@@ -12,7 +12,8 @@
     "color": "#4f8df7",
     "order": 10,
     "provider": "mimo",
-    "cloneAudioFile": ""
+    "cloneAudioFile": "",
+    "inSubscription": true
   },
   {
     "id": "mimo-moli",
@@ -27,7 +28,8 @@
     "color": "#20c997",
     "order": 20,
     "provider": "mimo",
-    "cloneAudioFile": ""
+    "cloneAudioFile": "",
+    "inSubscription": true
   },
   {
     "id": "mimo-suda",
@@ -42,7 +44,8 @@
     "color": "#ff8a24",
     "order": 30,
     "provider": "mimo",
-    "cloneAudioFile": ""
+    "cloneAudioFile": "",
+    "inSubscription": true
   },
   {
     "id": "mimo-baihua",
@@ -57,7 +60,8 @@
     "color": "#7c4dff",
     "order": 40,
     "provider": "mimo",
-    "cloneAudioFile": ""
+    "cloneAudioFile": "",
+    "inSubscription": true
   },
   {
     "id": "mimo-default",
@@ -72,7 +76,8 @@
     "color": "#0f766e",
     "order": 50,
     "provider": "mimo",
-    "cloneAudioFile": ""
+    "cloneAudioFile": "",
+    "inSubscription": true
   },
   {
     "id": "mimo-mia",
@@ -87,7 +92,8 @@
     "color": "#f06292",
     "order": 60,
     "provider": "mimo",
-    "cloneAudioFile": ""
+    "cloneAudioFile": "",
+    "inSubscription": true
   },
   {
     "id": "mimo-chloe",
@@ -102,7 +108,8 @@
     "color": "#26a69a",
     "order": 70,
     "provider": "mimo",
-    "cloneAudioFile": ""
+    "cloneAudioFile": "",
+    "inSubscription": true
   },
   {
     "id": "mimo-milo",
@@ -117,7 +124,8 @@
     "color": "#5c6bc0",
     "order": 80,
     "provider": "mimo",
-    "cloneAudioFile": ""
+    "cloneAudioFile": "",
+    "inSubscription": true
   },
   {
     "id": "mimo-custom-10",
@@ -132,7 +140,8 @@
     "color": "",
     "order": 90,
     "provider": "mimo",
-    "cloneAudioFile": ""
+    "cloneAudioFile": "",
+    "inSubscription": true
   },
   {
     "id": "gemini-aoede",
@@ -143,11 +152,12 @@
     "language": "zh",
     "gender": "female",
     "description": "Gemini 女声，清亮自然",
-    "badge": "Gemini",
+    "badge": "",
     "color": "#1a73e8",
     "order": 200,
     "provider": "gemini",
-    "cloneAudioFile": ""
+    "cloneAudioFile": "",
+    "inSubscription": true
   },
   {
     "id": "gemini-kore",
@@ -158,11 +168,12 @@
     "language": "zh",
     "gender": "female",
     "description": "Gemini 女声，柔和稳重",
-    "badge": "Gemini",
+    "badge": "",
     "color": "#1a73e8",
     "order": 210,
     "provider": "gemini",
-    "cloneAudioFile": ""
+    "cloneAudioFile": "",
+    "inSubscription": true
   },
   {
     "id": "gemini-zephyr",
@@ -173,11 +184,12 @@
     "language": "zh",
     "gender": "female",
     "description": "Gemini 女声，明快轻盈",
-    "badge": "Gemini",
+    "badge": "",
     "color": "#1a73e8",
     "order": 220,
     "provider": "gemini",
-    "cloneAudioFile": ""
+    "cloneAudioFile": "",
+    "inSubscription": true
   },
   {
     "id": "gemini-charon",
@@ -188,11 +200,12 @@
     "language": "zh",
     "gender": "male",
     "description": "Gemini 男声，沉稳有力",
-    "badge": "Gemini",
+    "badge": "",
     "color": "#1a73e8",
     "order": 230,
     "provider": "gemini",
-    "cloneAudioFile": ""
+    "cloneAudioFile": "",
+    "inSubscription": true
   },
   {
     "id": "gemini-fenrir",
@@ -203,11 +216,12 @@
     "language": "zh",
     "gender": "male",
     "description": "Gemini 男声，低沉磁性",
-    "badge": "Gemini",
+    "badge": "",
     "color": "#1a73e8",
     "order": 240,
     "provider": "gemini",
-    "cloneAudioFile": ""
+    "cloneAudioFile": "",
+    "inSubscription": true
   },
   {
     "id": "gemini-puck",
@@ -218,11 +232,12 @@
     "language": "en",
     "gender": "male",
     "description": "Gemini English male voice",
-    "badge": "Gemini",
+    "badge": "",
     "color": "#1a73e8",
     "order": 250,
     "provider": "gemini",
-    "cloneAudioFile": ""
+    "cloneAudioFile": "",
+    "inSubscription": true
   },
   {
     "id": "gemini-leda",
@@ -233,10 +248,11 @@
     "language": "en",
     "gender": "female",
     "description": "Gemini English female voice",
-    "badge": "Gemini",
+    "badge": "",
     "color": "#1a73e8",
     "order": 260,
     "provider": "gemini",
-    "cloneAudioFile": ""
+    "cloneAudioFile": "",
+    "inSubscription": true
   }
 ]
