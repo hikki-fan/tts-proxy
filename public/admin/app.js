@@ -340,6 +340,38 @@ function bindEvents() {
     }
   });
 
+  // 删除克隆音色确认弹窗
+  let _deleteCloneTarget = null;
+  document.getElementById('deleteCloneOk').addEventListener('click', async () => {
+    const voice = _deleteCloneTarget;
+    if (!voice) return;
+    document.getElementById('deleteCloneModal').hidden = true;
+    _deleteCloneTarget = null;
+    const updated = state.voices.filter(v => v.id !== voice.id);
+    await adminJson('/api/admin/voices', { method: 'PUT', body: JSON.stringify({ voices: updated }) });
+    state.voices = updated;
+    if (state.selectedVoiceId === voice.id) state.selectedVoiceId = '';
+    renderCloneVoiceCards();
+    renderVoiceOptions();
+    toast(`已删除「${voice.name}」`);
+  });
+  document.getElementById('deleteCloneCancel').addEventListener('click', () => {
+    document.getElementById('deleteCloneModal').hidden = true;
+    _deleteCloneTarget = null;
+  });
+  document.getElementById('deleteCloneModal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) {
+      e.currentTarget.hidden = true;
+      _deleteCloneTarget = null;
+    }
+  });
+
+  window._showDeleteCloneConfirm = (voice) => {
+    _deleteCloneTarget = voice;
+    document.getElementById('deleteCloneDesc').textContent = `确认删除克隆音色「${voice.name}」？删除后无法恢复。`;
+    document.getElementById('deleteCloneModal').hidden = false;
+  };
+
   document.getElementById('mimoApiKeyHelpBtn').addEventListener('click', () => {
     document.getElementById('mimoKeyModal').hidden = false;
   });
@@ -1223,16 +1255,9 @@ function makeVoiceCard(voice, isClone) {
       e.stopPropagation();
       uploadCloneAudio(voice.id);
     });
-    card.querySelector('.clone-delete-btn').addEventListener('click', async (e) => {
+    card.querySelector('.clone-delete-btn').addEventListener('click', (e) => {
       e.stopPropagation();
-      if (!confirm(`确认删除克隆音色「${voice.name}」？`)) return;
-      const updated = state.voices.filter(v => v.id !== voice.id);
-      await adminJson('/api/admin/voices', { method: 'PUT', body: JSON.stringify({ voices: updated }) });
-      state.voices = updated;
-      if (state.selectedVoiceId === voice.id) state.selectedVoiceId = '';
-      renderCloneVoiceCards();
-      renderVoiceOptions();
-      toast(`已删除「${voice.name}」`);
+      window._showDeleteCloneConfirm?.(voice);
     });
   }
 

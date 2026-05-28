@@ -643,6 +643,21 @@
       </div>
     </div>
 
+    <!-- 删除克隆音色二次确认 -->
+    <div id="deleteCloneModal" class="modal-overlay" hidden>
+      <div class="modal-card confirm-modal-card">
+        <div class="modal-icon danger-icon">
+          <svg viewBox="0 0 20 20" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" width="26" height="26"><polyline points="3 6 5 6 19 6"/><path d="M8 6V4h4v2"/><path d="M19 6l-1 12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2L3 6"/><line x1="10" y1="11" x2="10" y2="15"/><line x1="14" y1="11" x2="14" y2="15"/></svg>
+        </div>
+        <h2>删除音色</h2>
+        <p id="deleteCloneDesc">删除后无法恢复，已上传的音频样本也将一并移除。</p>
+        <div class="confirm-actions">
+          <button type="button" id="deleteCloneOk" class="danger-btn">确认删除</button>
+          <button type="button" id="deleteCloneCancel">取消</button>
+        </div>
+      </div>
+    </div>
+
     <!-- 清空 API Key 二次确认 -->
     <div id="clearKeyConfirmModal" class="modal-overlay" hidden>
       <div class="modal-card confirm-modal-card">
