@@ -309,6 +309,16 @@ function bindEvents() {
     if (e.target === e.currentTarget) e.currentTarget.hidden = true;
   });
 
+  document.getElementById('mimoApiKeyHelpBtn').addEventListener('click', () => {
+    document.getElementById('mimoKeyModal').hidden = false;
+  });
+  document.getElementById('closeMimoKeyModal').addEventListener('click', () => {
+    document.getElementById('mimoKeyModal').hidden = true;
+  });
+  document.getElementById('mimoKeyModal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) e.currentTarget.hidden = true;
+  });
+
   // Token 清空按钮
   document.querySelectorAll('.clear-token-btn').forEach((btn) => {
     btn.addEventListener('click', () => {

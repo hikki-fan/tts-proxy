@@ -1807,6 +1807,66 @@ td:last-child, th:last-child { width: 120px; }
 
 .theme-custom-label:hover input[type="color"] { transform: scale(1.18); }
 
+/* ─── Guide Steps Modal ───────────────────────────────────────────────────── */
+
+.mimo-key-modal-card {
+  width: min(420px, calc(100vw - 32px));
+  text-align: left;
+  align-items: flex-start;
+}
+
+.mimo-key-modal-card h2 { align-self: center; }
+
+.guide-steps {
+  margin: 4px 0 0;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.guide-steps li { padding-left: 4px; }
+
+.modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.btn-primary-link {
+  display: block;
+  text-align: center;
+  padding: 9px 16px;
+  border-radius: var(--radius-xs);
+  background: var(--accent-grad);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: var(--shadow-accent);
+  transition: opacity 0.15s;
+}
+.btn-primary-link:hover { opacity: 0.88; }
+
+.btn-secondary-link {
+  display: block;
+  text-align: center;
+  padding: 8px 16px;
+  border-radius: var(--radius-xs);
+  background: var(--bg2);
+  color: var(--text);
+  font-size: 13px;
+  text-decoration: none;
+  border: 1.5px solid var(--line);
+  transition: border-color 0.15s;
+}
+.btn-secondary-link:hover { border-color: var(--accent); color: var(--accent); }
+
 /* ─── About Modal ─────────────────────────────────────────────────────────── */
 
 .modal-overlay {

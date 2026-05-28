@@ -213,7 +213,10 @@
             <div class="settings-panel settings-grid" id="settingsPanelMimo">
               <label>
                 <span>MiMo API Key</span>
-                <input id="settingsMimoApiKey" type="password" autocomplete="off" placeholder="留空不修改">
+                <div class="copy-line">
+                  <input id="settingsMimoApiKey" type="password" autocomplete="off" placeholder="留空不修改">
+                  <button type="button" id="mimoApiKeyHelpBtn" title="如何获取 API Key">获取</button>
+                </div>
               </label>
               <label class="check setting-check">
                 <input id="clearMimoApiKey" type="checkbox"><span>清空 MiMo API Key</span>
@@ -635,6 +638,27 @@
           <span>运行端口：<strong id="aboutPort">3000</strong></span>
         </div>
         <button type="button" id="closeAboutBtn" class="primary">关闭</button>
+      </div>
+    </div>
+
+    <!-- MiMo API Key 获取引导 -->
+    <div id="mimoKeyModal" class="modal-overlay" hidden>
+      <div class="modal-card mimo-key-modal-card">
+        <div class="modal-icon">
+          <svg viewBox="0 0 20 20" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" width="28" height="28"><circle cx="8" cy="8" r="5"/><path d="M13 13l4 4"/><circle cx="8" cy="8" r="2" fill="white" stroke="none"/></svg>
+        </div>
+        <h2>获取 MiMo API Key</h2>
+        <ol class="guide-steps">
+          <li>访问 <strong>MiMo 开放平台</strong>，注册或登录账号</li>
+          <li>进入控制台 → <strong>API Keys</strong> 页面</li>
+          <li>点击「<strong>创建密钥</strong>」，填写名称后确认</li>
+          <li>复制生成的密钥，粘贴到配置页的「MiMo API Key」输入框</li>
+        </ol>
+        <div class="modal-actions">
+          <a href="https://platform.xiaomimimo.com/console/api-keys" target="_blank" rel="noopener" class="btn-primary-link">前往 API Keys 页面</a>
+          <a href="https://platform.xiaomimimo.com/docs/zh-CN/quick-start/first-api-call" target="_blank" rel="noopener" class="btn-secondary-link">查看快速开始文档</a>
+        </div>
+        <button type="button" id="closeMimoKeyModal">关闭</button>
       </div>
     </div>
 
