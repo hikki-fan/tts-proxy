@@ -4,7 +4,7 @@
 [![Docker](https://img.shields.io/badge/Docker-ready-blue)](https://hub.docker.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
-MiMo TTS HTTP Proxy 是一个面向阅读 App 的 TTS 代理服务。它把 MiMo TTS 和 Gemini Live Audio 封装成 HTTP 接口，并自动生成阅读/Legado/Gedoor 可导入的声音源配置。
+TTS HTTP Proxy 是一个面向阅读 App 的 TTS 代理服务。它把 MiMo TTS 和 Gemini Live Audio 封装成 HTTP 接口，并自动生成阅读/Legado/Gedoor 可导入的声音源配置。
 
 服务自带 Web 管理后台，默认入口：
 
