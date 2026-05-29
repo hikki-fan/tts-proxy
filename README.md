@@ -1,4 +1,4 @@
-# MiMo TTS HTTP Proxy
+# TTS HTTP Proxy
 
 [![Node.js](https://img.shields.io/badge/Node.js-18%2B-green)](https://nodejs.org)
 [![Docker](https://img.shields.io/badge/Docker-ready-blue)](https://hub.docker.com)
